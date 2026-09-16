@@ -99,6 +99,7 @@ def _driver_full(d) -> dict:
         **brief,
         "stats": _driver_stats(d),
         "history": history,
+        "price_history": d.price_history,
         "last_breakdown": d.round_breakdown.get(last_round, []),
         "teammate": _driver_brief(teammate) if teammate else None,
     }
@@ -242,7 +243,24 @@ def constructor_detail(slug: str):
         for rnd in range(1, s.next_round)
     ]
     drivers_full = [_driver_brief(s.drivers[d]) for d in c.driver_ids]
-    return {**brief, "history": history, "drivers_full": drivers_full}
+    return {**brief, "history": history, "price_history": c.price_history, "drivers_full": drivers_full}
+
+
+@router.get("/market")
+def market():
+    """Price movers this round — biggest risers and fallers (drivers)."""
+    s = STORE.season
+    rows = []
+    for d in s.drivers.values():
+        rows.append({
+            "id": d.id, "name": d.name, "short": d.short, "slug": d.slug,
+            "color": s.constructors[d.constructor_id].color,
+            "price": d.price, "delta": round(d.price - d.price_prev, 1),
+            "ownership": d.ownership,
+        })
+    risers = sorted([r for r in rows if r["delta"] > 0], key=lambda r: r["delta"], reverse=True)[:5]
+    fallers = sorted([r for r in rows if r["delta"] < 0], key=lambda r: r["delta"])[:5]
+    return {"risers": risers, "fallers": fallers}
 
 
 # --------------------------------------------------------------------------- #

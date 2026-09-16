@@ -25,6 +25,7 @@ from .scoring import (
     DriverRaceResult,
     FantasyScoringEngine,
 )
+from .pricing import price_constructor_path, price_driver_path
 
 UTC = timezone.utc
 SEASON_YEAR = 2026
@@ -132,6 +133,7 @@ class Constructor:
     driver_ids: List[int] = field(default_factory=list)
     price: float = 0.0
     price_prev: float = 0.0
+    price_history: list = field(default_factory=list)
     points: int = 0
     form: float = 0.0
     round_points: Dict[int, int] = field(default_factory=dict)
@@ -151,6 +153,7 @@ class Driver:
     slug: str = ""
     price: float = 0.0
     price_prev: float = 0.0
+    price_history: list = field(default_factory=list)
     points: int = 0
     form: float = 0.0
     status: str = "active"  # active / reserve / withdrawn / suspended
@@ -526,33 +529,29 @@ def _finalize_metrics(drivers: Dict[int, Driver], constructors: Dict[int, Constr
         avg = sum(recent) / len(recent) if recent else 0
         c.form = round(max(0.0, min(10.0, avg / 8.0)), 1)
 
-    # Prices: map season points to a $5.0–$30.0 market for drivers.
-    d_pts = [d.points for d in drivers.values()]
-    dmin, dmax = min(d_pts), max(d_pts)
-    for d in drivers.values():
-        frac = (d.points - dmin) / (dmax - dmin) if dmax > dmin else 0.5
-        # slight curve so top drivers are premium
-        price = 5.0 + (frac ** 0.85) * 24.5
-        d.price = round(price * 2) / 2  # nearest 0.5
-        # Previous price implied by a small form-based drift.
-        drift = (d.form - 5.0) * 0.12
-        d.price_prev = round((d.price - drift) * 2) / 2
-
-    c_pts = [c.points for c in constructors.values()]
-    cmin, cmax = min(c_pts), max(c_pts)
-    for c in constructors.values():
-        frac = (c.points - cmin) / (cmax - cmin) if cmax > cmin else 0.5
-        price = 6.0 + (frac ** 0.9) * 20.0
-        c.price = round(price * 2) / 2
-        drift = (c.form - 5.0) * 0.15
-        c.price_prev = round((c.price - drift) * 2) / 2
-
-    # Ownership: deterministic pseudo-metric anchored to price/form so the
-    # market looks alive without scanning any real teams.
+    # Ownership first (points/form-anchored) so the pricing engine can use it.
     rng = random.Random(4242)
     for d in sorted(drivers.values(), key=lambda x: x.points, reverse=True):
-        base = 6 + (d.price / 30.0) * 48 + d.form * 2
+        base = 6 + (d.points / max(1, max(x.points for x in drivers.values()))) * 52 + d.form * 2
         d.ownership = round(min(72.0, max(1.0, base + rng.uniform(-6, 6))), 1)
     for c in sorted(constructors.values(), key=lambda x: x.points, reverse=True):
-        base = 8 + (c.price / 26.0) * 44 + c.form * 2
+        base = 8 + (c.points / max(1, max(x.points for x in constructors.values()))) * 46 + c.form * 2
         c.ownership = round(min(70.0, max(2.0, base + rng.uniform(-5, 5))), 1)
+
+    # Dynamic pricing — evolve prices across the season from performance, form
+    # and ownership (see pricing.py). Opening price anchored to skill + pace.
+    d_raw = {d.id: d.skill * 0.6 + constructors[d.constructor_id].pace * 40 for d in drivers.values()}
+    d_lo, d_hi = min(d_raw.values()), max(d_raw.values())
+    for d in drivers.values():
+        hist = price_driver_path(d_raw[d.id], d_lo, d_hi, d.round_points, d.form, d.ownership, completed)
+        d.price_history = hist
+        d.price = hist[-1]["price"]
+        d.price_prev = hist[-2]["price"] if len(hist) > 1 else d.price
+
+    c_raw = {c.id: c.pace * 40 for c in constructors.values()}
+    c_lo, c_hi = min(c_raw.values()), max(c_raw.values())
+    for c in constructors.values():
+        hist = price_constructor_path(c_raw[c.id], c_lo, c_hi, c.round_points, c.form, c.ownership, completed)
+        c.price_history = hist
+        c.price = hist[-1]["price"]
+        c.price_prev = hist[-2]["price"] if len(hist) > 1 else c.price

@@ -6,6 +6,7 @@ import { Countdown, CountUp } from '../../components/motion'
 import { Avatar, Skeleton } from '../../components/bits'
 import { ScoreBreakdown } from '../../components/ScoreBreakdown'
 import { SpeedBackground } from '../../components/SpeedBackground'
+import { CircuitTrace } from '../races/CircuitTrace'
 import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { useMeta } from '../../lib/meta'
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const nr = meta?.next_race
   const team = me?.team
   const hasTeam = !!team?.driver_ids?.length
+  const leader = [...drivers.values()].sort((a, b) => b.points - a.points)[0]
   const checklist = [
     { label: 'Team complete', done: (team?.driver_ids.length ?? 0) === (meta?.config.roster.drivers ?? 5) && (team?.constructor_ids.length ?? 0) === (meta?.config.roster.constructors ?? 2) },
     { label: 'Captain selected', done: !!team?.captain_id },
@@ -135,8 +137,38 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Weekend checklist */}
+          {/* Overview: circuit map + championship leader + checklist */}
           <div className="col gap-3">
+            <div className="panel panel-pad">
+              <div className="row between" style={{ marginBottom: 4 }}>
+                <span className="eyebrow">Track Overview</span>
+                <span className="eyebrow">{nr?.is_sprint ? 'Sprint' : 'Grand Prix'}</span>
+              </div>
+              <span className="section-title" style={{ fontSize: 16 }}>{nr?.circuit ?? '—'}</span>
+              {nr && <div style={{ margin: '8px -6px 0' }}><CircuitTrace seed={nr.slug} height={150} /></div>}
+              <div className="row between" style={{ marginTop: 8 }}>
+                {[['Length', nr ? `${nr.length_km} km` : '—'], ['Laps', nr?.laps ?? '—'], ['Weather', nr?.weather ?? '—']].map(([k, v]) => (
+                  <div key={k as string}><div className="eyebrow">{k}</div><div className="num" style={{ fontWeight: 700, marginTop: 2 }}>{v}</div></div>
+                ))}
+              </div>
+            </div>
+
+            {leader && (
+              <div className="panel" style={{ overflow: 'hidden', border: '1px solid transparent' }}>
+                <div className="row between" style={{ padding: 18, background: `linear-gradient(120deg, ${leader.constructor.color} -10%, #7a0400 120%)`, color: '#fff' }}>
+                  <div>
+                    <span className="eyebrow" style={{ color: 'rgba(255,255,255,.8)' }}>Championship Leader</span>
+                    <div className="display" style={{ fontSize: 22, marginTop: 4 }}>{leader.name}</div>
+                    <span style={{ fontSize: 13, opacity: 0.85 }}>{leader.constructor.name} · {leader.points} pts</span>
+                  </div>
+                  <div className="col center">
+                    <Avatar name={leader.name} number={leader.number} color={leader.constructor.color} size={52} />
+                    <span className="display" style={{ fontSize: 30, marginTop: 6 }}>{String(leader.number).padStart(2, '0')}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="panel panel-pad">
               <span className="section-title" style={{ fontSize: 16 }}>Weekend checklist</span>
               <div className="col gap-1" style={{ marginTop: 12 }}>
