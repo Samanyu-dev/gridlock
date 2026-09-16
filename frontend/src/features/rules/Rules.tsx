@@ -11,15 +11,28 @@ export default function Rules() {
   useEffect(() => { api.rules().then((r) => setData(r as unknown as RulesData)).catch(() => {}) }, [])
   if (!data) return <div className="page container"><Skeleton h={300} /></div>
   const r = data.rules
-  const finish = r.finish_points as Record<string, number>
-  const sprint = r.sprint_finish_points as Record<string, number>
+  const quali = r.quali_points as Record<string, number>
+  const finish = r.race_points as Record<string, number>
+  const sprint = r.sprint_points as Record<string, number>
 
   const bonus: [string, number][] = [
-    ['Fastest lap', r.fastest_lap as number], ['Driver of the Day', r.driver_of_the_day as number],
-    ['Pole position', r.pole as number], ['Reached Q3', r.reached_q3 as number], ['Reached Q2', r.reached_q2 as number],
-    ['Classified finish', r.classified_finish as number], ['Position gained (each)', r.position_gained as number],
-    ['Position lost (each)', r.position_lost as number], ['Beat teammate — race', r.beat_teammate_race as number],
-    ['Beat teammate — quali', r.beat_teammate_quali as number], ['DNF', r.dnf as number], ['DSQ', r.dsq as number],
+    ['Qualifying — beat teammate', r.quali_beat_teammate as number],
+    ['Race — beat teammate', r.race_beat_teammate as number],
+    ['Fastest lap', r.fastest_lap as number],
+    ['Position gained (each, max +' + (r.position_gained_max as number) + ')', r.position_gained as number],
+    ['Position lost (each, max ' + (r.position_lost_max as number) + ')', r.position_lost as number],
+    ['Classified finish', r.classified as number],
+    ['DNF', r.dnf as number], ['DNS', r.dns as number], ['DSQ', r.dsq as number],
+  ]
+  const constructorRules: [string, number | string][] = [
+    ['Drivers combined (race finish)', `${Math.round((r.constructor_race_fraction as number) * 100)}%`],
+    ['Both cars reach Q3', r.constructor_both_q3 as number],
+    ['Front-row lockout', r.constructor_front_row_lockout as number],
+    ['1-2 finish (top tier)', r.constructor_tier_1_2 as number],
+    ['Double podium', r.constructor_tier_double_podium as number],
+    ['Both top 5', r.constructor_tier_both_top5 as number],
+    ['Both in the points', r.constructor_tier_both_points as number],
+    ['Both classified', r.constructor_both_classified as number],
   ]
 
   return (
@@ -40,24 +53,19 @@ export default function Rules() {
         </Section>
 
         <div className="grid g2" style={{ marginBottom: 20 }}>
+          <PointsTable title="Qualifying points" table={quali} color="var(--info)" />
+          <PointsTable title="Race finish points" table={finish} color="var(--gain)" />
+          <PointsTable title="Sprint points" table={sprint} color="var(--caution)" />
           <div className="panel panel-pad">
-            <span className="section-title" style={{ fontSize: 16 }}>Race finish points</span>
-            <div className="grid g2" style={{ marginTop: 12, gap: 6 }}>
-              {Object.entries(finish).map(([pos, pts]) => (
-                <div key={pos} className="row between" style={{ padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
-                  <span className={`pos pos-${pos}`}>P{pos}</span><span className="num" style={{ fontWeight: 700, color: 'var(--gain)' }}>+{pts}</span>
+            <span className="section-title" style={{ fontSize: 16 }}>Constructor scoring</span>
+            <div className="col gap-1" style={{ marginTop: 12 }}>
+              {constructorRules.map(([k, v]) => (
+                <div key={k} className="row between" style={{ padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                  <span style={{ fontSize: 13 }}>{k}</span>
+                  <span className="num" style={{ fontWeight: 700 }}>{typeof v === 'number' ? `+${v}` : v}</span>
                 </div>
               ))}
-            </div>
-          </div>
-          <div className="panel panel-pad">
-            <span className="section-title" style={{ fontSize: 16 }}>Sprint points</span>
-            <div className="grid g2" style={{ marginTop: 12, gap: 6 }}>
-              {Object.entries(sprint).map(([pos, pts]) => (
-                <div key={pos} className="row between" style={{ padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
-                  <span className={`pos pos-${pos}`}>P{pos}</span><span className="num" style={{ fontWeight: 700, color: 'var(--caution)' }}>+{pts}</span>
-                </div>
-              ))}
+              <span className="text-faint" style={{ fontSize: 11, marginTop: 4 }}>Race team result uses the highest applicable tier only — bonuses never stack.</span>
             </div>
           </div>
         </div>
@@ -83,6 +91,21 @@ export default function Rules() {
             ))}
           </div>
         </Section>
+      </div>
+    </div>
+  )
+}
+
+function PointsTable({ title, table, color }: { title: string; table: Record<string, number>; color: string }) {
+  return (
+    <div className="panel panel-pad">
+      <span className="section-title" style={{ fontSize: 16 }}>{title}</span>
+      <div className="grid g2" style={{ marginTop: 12, gap: 6 }}>
+        {Object.entries(table || {}).map(([pos, pts]) => (
+          <div key={pos} className="row between" style={{ padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+            <span className={`pos pos-${pos}`}>P{pos}</span><span className="num" style={{ fontWeight: 700, color }}>+{pts}</span>
+          </div>
+        ))}
       </div>
     </div>
   )

@@ -135,6 +135,7 @@ class Constructor:
     points: int = 0
     form: float = 0.0
     round_points: Dict[int, int] = field(default_factory=dict)
+    round_breakdown: Dict[int, list] = field(default_factory=dict)
     ownership: float = 0.0
 
 
@@ -312,9 +313,6 @@ def _simulate_round(rnd: int, drivers: List[Driver], constructors: Dict[int, Con
             finish=finish,
             status=status,
             fastest_lap=(d.id == fastest_lap_id),
-            driver_of_the_day=(d.id == dotd_id),
-            reached_q3=quali_order[d.id] <= 10,
-            reached_q2=quali_order[d.id] <= 15,
             quali_position=quali_order[d.id],
             is_sprint=False,
         )
@@ -322,12 +320,9 @@ def _simulate_round(rnd: int, drivers: List[Driver], constructors: Dict[int, Con
     constructor_results: Dict[int, ConstructorRaceResult] = {}
     for cid, c in constructors.items():
         drs = [driver_results[did] for did in c.driver_ids]
-        both_finished = all(dr.status in (FINISHED, CLASSIFIED) for dr in drs)
         constructor_results[cid] = ConstructorRaceResult(
             constructor_id=cid,
             driver_results=drs,
-            fastest_pit_stop=(pit_rank_of[cid] == 1),
-            both_finished=both_finished,
             pit_stop_rank=pit_rank_of[cid],
         )
 
@@ -452,7 +447,7 @@ def build_season(now: Optional[datetime] = None) -> Season:
                 "status": result.status,
                 "quali": result.quali_position,
                 "fastest_lap": result.fastest_lap,
-                "dotd": result.driver_of_the_day,
+                "dotd": did == meta["dotd_id"],
             }
 
         for cid, result in cr.items():
@@ -460,9 +455,10 @@ def build_season(now: Optional[datetime] = None) -> Season:
             c = constructors[cid]
             c.points += bd.total
             c.round_points[race.round] = bd.total
+            c.round_breakdown[race.round] = bd.items
 
         # Build race classification + quali tables for the race detail page.
-        race.classification = _classification_rows(dr, drivers, constructors)
+        race.classification = _classification_rows(dr, drivers, constructors, meta["dotd_id"])
         race.quali = _quali_rows(meta["quali_order"], drivers, constructors)
 
     _finalize_metrics(drivers, constructors)
@@ -484,17 +480,19 @@ def _teammate_result(did, drivers, dr):
     return None
 
 
-def _classification_rows(dr, drivers, constructors):
+def _classification_rows(dr, drivers, constructors, dotd_id=None):
+    from .scoring import CLASSIFIED_STATES
     rows = []
     for did, r in dr.items():
         d = drivers[did]
+        classified = r.status in CLASSIFIED_STATES and r.finish is not None
         rows.append({
             "driver_id": did, "name": d.name, "short": d.short, "number": d.number,
             "constructor": constructors[d.constructor_id].name,
             "color": constructors[d.constructor_id].color,
             "grid": r.grid, "finish": r.finish, "status": r.status,
-            "fastest_lap": r.fastest_lap, "dotd": r.driver_of_the_day,
-            "delta": (r.grid - r.finish) if r.finish else None,
+            "fastest_lap": r.fastest_lap, "dotd": did == dotd_id,
+            "delta": (r.grid - r.finish) if classified else None,
         })
     rows.sort(key=lambda x: (x["finish"] is None, x["finish"] or 99))
     return rows

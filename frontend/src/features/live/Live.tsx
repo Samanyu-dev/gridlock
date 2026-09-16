@@ -16,7 +16,7 @@ const TYRE: Record<string, { c: string; l: string }> = {
 }
 
 export default function Live() {
-  const { username } = useSession()
+  const { authed } = useSession()
   const meta = useMeta()
   const [snap, setSnap] = useState<LiveSnapshot | null>(null)
   const [me, setMe] = useState<MeResponse | null>(null)
@@ -28,8 +28,8 @@ export default function Live() {
 
   useEffect(() => {
     api.live().then((s) => { setSnap(s); setLap(s.lap); setEvents(s.events); setMyPts(120) }).catch(() => {})
-    if (username) api.me(username).then(setMe).catch(() => {})
-  }, [username])
+    if (authed) api.me().then(setMe).catch(() => {})
+  }, [authed])
 
   // Simulated live ticking (visual only — a real deploy streams via realtime).
   useEffect(() => {

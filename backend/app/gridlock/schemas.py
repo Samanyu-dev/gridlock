@@ -17,36 +17,14 @@ def _clean(value: str, label: str) -> str:
     return value
 
 
-class AuthRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=20, pattern=USERNAME_RE)
-    persona: Optional[str] = None
-    favorite_driver_id: Optional[int] = None
-    favorite_constructor_id: Optional[int] = None
-    team_name: Optional[str] = Field(default=None, max_length=28)
-    country: Optional[str] = None
-
-    @field_validator("username")
-    @classmethod
-    def _v_username(cls, v: str) -> str:
-        return _clean(v, "username")
-
-    @field_validator("team_name")
-    @classmethod
-    def _v_team(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        v = _clean(v, "team name")
-        if len(v) < 2:
-            raise ValueError("Team name is too short.")
-        return v
-
-
 class TeamPayload(BaseModel):
-    username: str
+    # Identity comes from the auth token, never this body.
     driver_ids: List[int]
     constructor_ids: List[int]
     captain_id: Optional[int] = None
     active_boost: Optional[str] = None
+    boost_driver_id: Optional[int] = None
+    boost_constructor_id: Optional[int] = None
 
 
 class ValidateTeamRequest(BaseModel):
@@ -56,7 +34,6 @@ class ValidateTeamRequest(BaseModel):
 
 
 class CreateLeagueRequest(BaseModel):
-    username: str
     name: str = Field(min_length=3, max_length=40)
     description: str = Field(default="", max_length=160)
     privacy: str = "private"
@@ -71,5 +48,4 @@ class CreateLeagueRequest(BaseModel):
 
 
 class JoinLeagueRequest(BaseModel):
-    username: str
     code: str

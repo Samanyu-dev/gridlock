@@ -1,14 +1,26 @@
 import type {
   Meta, Driver, DriverFull, Constructor, ConstructorFull, Race, RaceFull,
   MeResponse, Profile, TeamState, TeamScore, LeaderboardRow, LeagueSummary,
-  LeagueDetail, Insight, LiveSnapshot, SearchResult, Boost,
+  LeagueDetail, Insight, LiveSnapshot, SearchResult, Boost, WeekendScore,
 } from './types'
 
-async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+const TOKEN_KEY = 'gridlock.token'
+
+export function getToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+export function setToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch { /* ignore */ }
+}
+
+async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as Record<string, string>) }
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`/api${path}`, { ...options, headers })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.detail || `Request failed: ${res.status}`)
@@ -23,13 +35,16 @@ function qs(params: Record<string, string | number | undefined>): string {
   return '?' + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString()
 }
 
-export interface AuthPayload {
-  username: string; persona?: string; favorite_driver_id?: number
-  favorite_constructor_id?: number; team_name?: string; country?: string
+export interface RegisterPayload {
+  email: string; password: string; username: string
+  team_name?: string; persona?: string
+  favorite_driver_id?: number; favorite_constructor_id?: number; country?: string
 }
+export interface AuthResult { profile: Profile; access_token: string; token_type: string; verify_token?: string }
 export interface SaveTeamPayload {
-  username: string; driver_ids: number[]; constructor_ids: number[]
+  driver_ids: number[]; constructor_ids: number[]
   captain_id: number | null; active_boost: string | null
+  boost_driver_id?: number | null; boost_constructor_id?: number | null
 }
 
 export const api = {
@@ -48,27 +63,38 @@ export const api = {
   race: (slug: string) => req<RaceFull>(`/races/${slug}`),
   live: () => req<LiveSnapshot>('/live'),
 
-  auth: (payload: AuthPayload) =>
-    req<{ profile: Profile; created: boolean }>('/auth', { method: 'POST', body: JSON.stringify(payload) }),
-  me: (username: string) => req<MeResponse>(`/me${qs({ username })}`),
+  // --- auth (token-based) ---
+  register: (p: RegisterPayload) => req<AuthResult>('/auth/register', { method: 'POST', body: JSON.stringify(p) }),
+  login: (email: string, password: string) =>
+    req<AuthResult>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  logout: () => req<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
+  authMe: () => req<{ profile: Profile }>('/auth/me'),
+  requestReset: (email: string) => req<{ ok: boolean; reset_token?: string }>('/auth/reset/request', { method: 'POST', body: JSON.stringify({ email }) }),
+  confirmReset: (token: string, password: string) => req<{ ok: boolean }>('/auth/reset/confirm', { method: 'POST', body: JSON.stringify({ token, password }) }),
+  verifyEmail: (token: string) => req<{ ok: boolean }>('/auth/verify', { method: 'POST', body: JSON.stringify({ token }) }),
+  oauthStart: (provider: string) => req<{ authorize_url: string; client_id: string }>(`/auth/oauth/${provider}`),
+
+  // --- fantasy (identity from token) ---
+  me: () => req<MeResponse>('/me'),
   validateTeam: (p: { driver_ids: number[]; constructor_ids: number[]; captain_id: number | null }) =>
     req<{ valid: boolean; errors: string[]; cost: number; remaining: number; projected: TeamScore | null }>(
       '/team/validate', { method: 'POST', body: JSON.stringify(p) }),
   saveTeam: (payload: SaveTeamPayload) =>
-    req<{ team: TeamState; score: TeamScore; rank: number; field_size: number }>(
+    req<{ team: TeamState; score: TeamScore; rank: number; field_size: number; transfers: TransferOutcome }>(
       '/team', { method: 'PUT', body: JSON.stringify(payload) }),
+  teamScore: (round?: number) => req<WeekendScore>(`/team/score${qs({ round_id: round })}`),
 
-  leaderboard: (p: { offset?: number; limit?: number; username?: string } = {}) =>
+  leaderboard: (p: { offset?: number; limit?: number } = {}) =>
     req<{ entries: LeaderboardRow[]; total: number; me: LeaderboardRow | null }>(`/leaderboard${qs(p)}`),
 
-  leagues: (username?: string) =>
-    req<{ public: LeagueSummary[]; mine: LeagueSummary[] }>(`/leagues${qs({ username })}`),
-  createLeague: (p: { username: string; name: string; description: string; privacy: string; type: string }) =>
+  leagues: () => req<{ public: LeagueSummary[]; mine: LeagueSummary[] }>('/leagues'),
+  createLeague: (p: { name: string; description: string; privacy: string; type: string }) =>
     req<{ code: string; name: string }>('/leagues', { method: 'POST', body: JSON.stringify(p) }),
-  joinLeague: (p: { username: string; code: string }) =>
+  joinLeague: (p: { code: string }) =>
     req<{ code: string; joined: boolean }>('/leagues/join', { method: 'POST', body: JSON.stringify(p) }),
-  league: (code: string, username?: string) =>
-    req<LeagueDetail>(`/leagues/${code}${qs({ username })}`),
+  league: (code: string) => req<LeagueDetail>(`/leagues/${code}`),
 
   search: (q: string) => req<{ results: SearchResult[] }>(`/search${qs({ q })}`),
 }
+
+export interface TransferOutcome { transfers: number; free_used: number; penalized: number; penalty: number }

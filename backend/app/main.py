@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
 from .gridlock import models as gl_models  # noqa: F401 - registers tables
+from .gridlock.auth_router import router as auth_router
 from .gridlock.router import router as gridlock_router
 
 app = FastAPI(title="GRIDLOCK API")
@@ -26,4 +27,5 @@ def health():
     return {"status": "ok", "product": "GRIDLOCK"}
 
 
+app.include_router(auth_router)
 app.include_router(gridlock_router)

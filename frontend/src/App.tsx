@@ -6,6 +6,7 @@ import { MetaProvider } from './lib/meta'
 import { AppShell } from './components/AppShell'
 import Landing from './features/landing/Landing'
 import Onboarding from './features/onboarding/Onboarding'
+import Login from './features/onboarding/Login'
 import Dashboard from './features/dashboard/Dashboard'
 import TeamBuilder from './features/team/TeamBuilder'
 import Drivers from './features/drivers/Drivers'
@@ -23,9 +24,9 @@ import Profile from './features/profile/Profile'
 import More from './features/profile/More'
 
 function RequireUser({ children }: { children: ReactNode }) {
-  const { username } = useSession()
+  const { authed } = useSession()
   const loc = useLocation()
-  if (!username) return <Navigate to="/" replace state={{ from: loc.pathname }} />
+  if (!authed) return <Navigate to="/login" replace state={{ from: loc.pathname }} />
   return <AppShell>{children}</AppShell>
 }
 
@@ -36,6 +37,7 @@ function AppRoutes() {
       <Routes location={location} key={location.pathname.split('/').slice(0, 2).join('/')}>
         <Route path="/" element={<Landing />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/home" element={<RequireUser><Dashboard /></RequireUser>} />
         <Route path="/team" element={<RequireUser><TeamBuilder /></RequireUser>} />
         <Route path="/drivers" element={<RequireUser><Drivers /></RequireUser>} />

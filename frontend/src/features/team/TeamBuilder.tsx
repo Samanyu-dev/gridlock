@@ -12,7 +12,7 @@ import { money } from '../../lib/format'
 import type { Constructor, Driver } from '../../lib/types'
 
 export default function TeamBuilder() {
-  const { username } = useSession()
+  const { authed } = useSession()
   const meta = useMeta()
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [constructors, setConstructors] = useState<Constructor[]>([])
@@ -31,13 +31,13 @@ export default function TeamBuilder() {
   useEffect(() => {
     api.drivers({ sort: 'points' }).then((r) => setDrivers(r.drivers)).catch(() => {})
     api.constructors().then((r) => setConstructors(r.constructors)).catch(() => {})
-    if (username) api.me(username).then((m) => {
+    if (authed) api.me().then((m) => {
       if (m.team) {
         setSelDrivers(m.team.driver_ids); setSelConstructors(m.team.constructor_ids)
         setCaptain(m.team.captain_id); setBoost(m.team.active_boost)
       }
     }).catch(() => {})
-  }, [username])
+  }, [authed])
 
   const dMap = useMemo(() => new Map(drivers.map((d) => [d.id, d])), [drivers])
   const cMap = useMemo(() => new Map(constructors.map((c) => [c.id, c])), [constructors])
@@ -78,16 +78,18 @@ export default function TeamBuilder() {
   }, [drivers, search, sort])
 
   const save = async () => {
-    if (!username || !complete) return
+    if (!authed || !complete) return
     setSaving(true)
     try {
       const res = await api.saveTeam({
-        username, driver_ids: selDrivers, constructor_ids: selConstructors,
+        driver_ids: selDrivers, constructor_ids: selConstructors,
         captain_id: captain, active_boost: boost,
       })
-      setToast(`Team locked in — projected rank #${res.rank.toLocaleString()} of ${res.field_size.toLocaleString()}`)
-      setTimeout(() => setToast(null), 4000)
-    } catch (e) { setToast((e as Error).message); setTimeout(() => setToast(null), 4000) }
+      const t = res.transfers
+      const penaltyNote = t && t.penalty ? ` · ${t.penalized} extra transfer${t.penalized > 1 ? 's' : ''} (−${t.penalty} pts)` : ''
+      setToast(`Team locked in — projected rank #${res.rank.toLocaleString()} of ${res.field_size.toLocaleString()}${penaltyNote}`)
+      setTimeout(() => setToast(null), 4500)
+    } catch (e) { setToast((e as Error).message); setTimeout(() => setToast(null), 4500) }
     finally { setSaving(false) }
   }
 

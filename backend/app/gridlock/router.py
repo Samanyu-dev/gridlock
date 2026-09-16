@@ -12,10 +12,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from ..database import get_session
+from . import deadlines, snapshots, transfers
+from .auth import get_current_user, get_optional_user
 from .models import GLLeague, GLLeagueMember, GLProfile, GLTeam
 from .provider import get_provider
 from .schemas import (
-    AuthRequest,
     CreateLeagueRequest,
     JoinLeagueRequest,
     TeamPayload,
@@ -280,7 +281,9 @@ def _profile_by_username(session: Session, username: str) -> Optional[GLProfile]
 
 def _serialize_profile(p: GLProfile) -> dict:
     return {
-        "id": p.id, "username": p.username, "display_name": p.display_name or p.username,
+        "id": p.id, "username": p.username, "email": p.email,
+        "email_verified": p.email_verified, "is_admin": p.is_admin,
+        "display_name": p.display_name or p.username,
         "team_name": p.team_name, "persona": p.persona, "country": p.country,
         "favorite_driver_id": p.favorite_driver_id,
         "favorite_constructor_id": p.favorite_constructor_id,
@@ -294,52 +297,15 @@ def _serialize_team(t: Optional[GLTeam]) -> Optional[dict]:
     return {
         "driver_ids": t.driver_ids, "constructor_ids": t.constructor_ids,
         "captain_id": t.captain_id, "active_boost": t.active_boost,
-        "free_transfers": t.free_transfers,
+        "boost_driver_id": t.boost_driver_id, "boost_constructor_id": t.boost_constructor_id,
+        "free_transfers": t.free_transfers, "team_value": t.team_value, "bank": t.bank,
     }
 
 
-@router.post("/auth")
-def auth(body: AuthRequest, session: Session = Depends(get_session)):
-    p = _profile_by_username(session, body.username)
-    if p is None:
-        p = GLProfile(
-            username=body.username, display_name=body.username,
-            team_name=body.team_name or f"{body.username}'s Grid",
-            persona=body.persona, country=body.country,
-            favorite_driver_id=body.favorite_driver_id,
-            favorite_constructor_id=body.favorite_constructor_id,
-        )
-        session.add(p)
-        session.commit()
-        session.refresh(p)
-        created = True
-    else:
-        # Merge any onboarding fields provided on re-auth.
-        if body.team_name:
-            p.team_name = body.team_name
-        if body.persona:
-            p.persona = body.persona
-        if body.favorite_driver_id is not None:
-            p.favorite_driver_id = body.favorite_driver_id
-        if body.favorite_constructor_id is not None:
-            p.favorite_constructor_id = body.favorite_constructor_id
-        if body.country:
-            p.country = body.country
-        p.updated_at = datetime.utcnow()
-        session.add(p)
-        session.commit()
-        session.refresh(p)
-        created = False
-    return {"profile": _serialize_profile(p), "created": created}
-
-
 @router.get("/me")
-def me(username: str, session: Session = Depends(get_session)):
-    p = _profile_by_username(session, username)
-    if not p:
-        raise HTTPException(404, "Profile not found")
-    team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
-    result = {"profile": _serialize_profile(p), "team": _serialize_team(team)}
+def me(profile: GLProfile = Depends(get_current_user), session: Session = Depends(get_session)):
+    team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile.id)).first()
+    result = {"profile": _serialize_profile(profile), "team": _serialize_team(team)}
     if team and team.driver_ids and team.constructor_ids:
         score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
         rank, field_size = STORE.rank_for_total(score["total"])
@@ -347,6 +313,12 @@ def me(username: str, session: Session = Depends(get_session)):
         result["rank"] = rank
         result["field_size"] = field_size
         result["percentile"] = round(100 * rank / field_size, 1)
+        # Live/provisional/final ledger for the most recently completed round.
+        last_round = STORE.season.next_round - 1
+        result["weekend"] = snapshots.score_team_for_round(
+            team.driver_ids, team.constructor_ids, team.captain_id,
+            team.active_boost, team.boost_driver_id, team.boost_constructor_id, last_round,
+        )
     return result
 
 
@@ -361,29 +333,60 @@ def validate_team(body: ValidateTeamRequest):
 
 
 @router.put("/team")
-def save_team(body: TeamPayload, session: Session = Depends(get_session)):
-    p = _profile_by_username(session, body.username)
-    if not p:
-        raise HTTPException(404, "Profile not found")
-    ok, errors = STORE.validate_team(body.driver_ids, body.constructor_ids, body.captain_id)
-    if not ok:
-        raise HTTPException(400, "; ".join(errors))
-    if body.active_boost and body.active_boost not in {b["id"] for b in BOOSTS}:
-        raise HTTPException(400, "Unknown boost")
-    team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
-    if team is None:
-        team = GLTeam(profile_id=p.id)
-    team.driver_ids = body.driver_ids
-    team.constructor_ids = body.constructor_ids
-    team.captain_id = body.captain_id
-    team.active_boost = body.active_boost
-    team.updated_at = datetime.utcnow()
-    session.add(team)
-    session.commit()
-    session.refresh(team)
+def save_team(
+    body: TeamPayload,
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    # Deadline + validation + transfer accounting, transactional.
+    outcome = transfers.save_team(
+        session, profile.id, body.driver_ids, body.constructor_ids,
+        body.captain_id, body.active_boost, body.boost_driver_id, body.boost_constructor_id,
+    )
+    # Snapshot the team for the active round (provisional until results finalize).
+    snapshots.build_snapshot(session, profile.id, deadlines.active_round(), state="provisional")
+    team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile.id)).first()
     score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
     rank, field_size = STORE.rank_for_total(score["total"])
-    return {"team": _serialize_team(team), "score": score, "rank": rank, "field_size": field_size}
+    return {
+        "team": _serialize_team(team), "score": score, "rank": rank, "field_size": field_size,
+        "transfers": outcome.as_dict(),
+    }
+
+
+@router.get("/team/score")
+def team_score(
+    round_id: Optional[int] = None,
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Auditable weekend score for the authenticated user, from the ledger.
+
+    Historical rounds are read from the immutable snapshot; the current round is
+    scored from the live team. Response carries LIVE/PROVISIONAL/FINAL state."""
+    rid = round_id if round_id is not None else STORE.season.next_round - 1
+    snap = session.exec(
+        select(snapshots.GLTeamSnapshot).where(
+            snapshots.GLTeamSnapshot.profile_id == profile.id,
+            snapshots.GLTeamSnapshot.round_id == rid,
+        )
+    ).first()
+    if snap:
+        scored = snapshots.score_team_for_round(
+            snap.driver_ids, snap.constructor_ids, snap.captain_id,
+            snap.active_boost, snap.boost_driver_id, snap.boost_constructor_id, rid,
+        )
+        scored["from_snapshot"] = True
+        return scored
+    team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile.id)).first()
+    if not team or not team.driver_ids:
+        raise HTTPException(404, "No team to score")
+    scored = snapshots.score_team_for_round(
+        team.driver_ids, team.constructor_ids, team.captain_id,
+        team.active_boost, team.boost_driver_id, team.boost_constructor_id, rid,
+    )
+    scored["from_snapshot"] = False
+    return scored
 
 
 # --------------------------------------------------------------------------- #
@@ -395,24 +398,22 @@ def save_team(body: TeamPayload, session: Session = Depends(get_session)):
 def leaderboard(
     offset: int = 0,
     limit: int = Query(default=25, le=100),
-    username: Optional[str] = None,
+    p: Optional[GLProfile] = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ):
     managers = STORE.managers()
     page = managers[offset: offset + limit]
     me_row = None
-    if username:
-        p = _profile_by_username(session, username)
-        if p:
-            team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
-            if team and team.driver_ids and team.constructor_ids:
-                score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
-                rank, field_size = STORE.rank_for_total(score["total"])
-                me_row = {
-                    "rank": rank, "team_name": p.team_name, "manager": f"@{p.username}",
-                    "country": p.country, "total": score["total"],
-                    "last_race": score["last_race_points"], "movement": 0, "is_me": True,
-                }
+    if p:
+        team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
+        if team and team.driver_ids and team.constructor_ids:
+            score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
+            rank, field_size = STORE.rank_for_total(score["total"])
+            me_row = {
+                "rank": rank, "team_name": p.team_name, "manager": f"@{p.username}",
+                "country": p.country, "total": score["total"],
+                "last_race": score["last_race_points"], "movement": 0, "is_me": True,
+            }
     return {"entries": page, "total": len(managers) + (1 if me_row else 0), "me": me_row}
 
 
@@ -422,7 +423,7 @@ def leaderboard(
 
 
 @router.get("/leagues")
-def public_leagues(username: Optional[str] = None, session: Session = Depends(get_session)):
+def public_leagues(p: Optional[GLProfile] = Depends(get_optional_user), session: Session = Depends(get_session)):
     out = []
     for lg in STORE.public_leagues().values():
         out.append({
@@ -430,27 +431,26 @@ def public_leagues(username: Optional[str] = None, session: Session = Depends(ge
             "privacy": lg["privacy"], "type": lg["type"], "member_count": lg["member_count"],
         })
     mine = []
-    if username:
-        p = _profile_by_username(session, username)
-        if p:
-            memberships = session.exec(
-                select(GLLeague).join(GLLeagueMember, GLLeagueMember.league_id == GLLeague.id)
-                .where(GLLeagueMember.profile_id == p.id)
-            ).all()
-            for lg in memberships:
-                count = len(session.exec(select(GLLeagueMember).where(GLLeagueMember.league_id == lg.id)).all())
-                mine.append({
-                    "code": lg.code, "name": lg.name, "description": lg.description,
-                    "privacy": lg.privacy, "type": lg.type, "member_count": count,
-                })
+    if p:
+        memberships = session.exec(
+            select(GLLeague).join(GLLeagueMember, GLLeagueMember.league_id == GLLeague.id)
+            .where(GLLeagueMember.profile_id == p.id)
+        ).all()
+        for lg in memberships:
+            count = len(session.exec(select(GLLeagueMember).where(GLLeagueMember.league_id == lg.id)).all())
+            mine.append({
+                "code": lg.code, "name": lg.name, "description": lg.description,
+                "privacy": lg.privacy, "type": lg.type, "member_count": count,
+            })
     return {"public": out, "mine": mine}
 
 
 @router.post("/leagues")
-def create_league(body: CreateLeagueRequest, session: Session = Depends(get_session)):
-    p = _profile_by_username(session, body.username)
-    if not p:
-        raise HTTPException(404, "Profile not found")
+def create_league(
+    body: CreateLeagueRequest,
+    p: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     # Ensure unique code.
     for _ in range(6):
         code = new_league_code()
@@ -472,10 +472,11 @@ def create_league(body: CreateLeagueRequest, session: Session = Depends(get_sess
 
 
 @router.post("/leagues/join")
-def join_league(body: JoinLeagueRequest, session: Session = Depends(get_session)):
-    p = _profile_by_username(session, body.username)
-    if not p:
-        raise HTTPException(404, "Profile not found")
+def join_league(
+    body: JoinLeagueRequest,
+    p: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
     code = body.code.strip().upper()
     if not code.startswith("GRID-"):
         code = "GRID-" + code
@@ -496,27 +497,24 @@ def join_league(body: JoinLeagueRequest, session: Session = Depends(get_session)
 
 
 @router.get("/leagues/{code}")
-def league_detail(code: str, username: Optional[str] = None, session: Session = Depends(get_session)):
+def league_detail(code: str, p: Optional[GLProfile] = Depends(get_optional_user), session: Session = Depends(get_session)):
     code = code.strip().upper()
     if not code.startswith("GRID-"):
         code = "GRID-" + code
 
+    username = p.username if p else None
     # Demo public league?
     demo = STORE.public_leagues().get(code)
-    my_total = None
     my_row = None
-    if username:
-        p = _profile_by_username(session, username)
-        if p:
-            team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
-            if team and team.driver_ids and team.constructor_ids:
-                sc = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
-                my_total = sc["total"]
-                my_row = {
-                    "team_name": p.team_name, "manager": f"@{p.username}",
-                    "country": p.country, "total": my_total,
-                    "last_race": sc["last_race_points"], "is_me": True,
-                }
+    if p:
+        team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
+        if team and team.driver_ids and team.constructor_ids:
+            sc = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
+            my_row = {
+                "team_name": p.team_name, "manager": f"@{p.username}",
+                "country": p.country, "total": sc["total"],
+                "last_race": sc["last_race_points"], "is_me": True,
+            }
 
     if demo:
         members = list(demo["members"])

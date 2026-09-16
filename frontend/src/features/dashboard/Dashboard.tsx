@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Check, Circle, Sparkles, Flag, TrendingUp } from 'lucide-react'
 import { Countdown, CountUp } from '../../components/motion'
 import { Avatar, Skeleton } from '../../components/bits'
+import { ScoreBreakdown } from '../../components/ScoreBreakdown'
 import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { useMeta } from '../../lib/meta'
@@ -11,7 +12,7 @@ import { flagEmoji, money } from '../../lib/format'
 import type { Driver, Constructor, Insight, MeResponse } from '../../lib/types'
 
 export default function Dashboard() {
-  const { username, profile } = useSession()
+  const { authed, profile } = useSession()
   const meta = useMeta()
   const [me, setMe] = useState<MeResponse | null>(null)
   const [drivers, setDrivers] = useState<Map<number, Driver>>(new Map())
@@ -19,11 +20,11 @@ export default function Dashboard() {
   const [insights, setInsights] = useState<Insight[]>([])
 
   useEffect(() => {
-    if (username) api.me(username).then(setMe).catch(() => {})
+    if (authed) api.me().then(setMe).catch(() => {})
     api.drivers().then((r) => setDrivers(new Map(r.drivers.map((d) => [d.id, d])))).catch(() => {})
     api.constructors().then((r) => setConstructors(new Map(r.constructors.map((c) => [c.id, c])))).catch(() => {})
     api.insights().then((r) => setInsights(r.insights)).catch(() => {})
-  }, [username])
+  }, [authed])
 
   const nr = meta?.next_race
   const team = me?.team
@@ -66,7 +67,7 @@ export default function Dashboard() {
               <Stat k="Total points" v={<CountUp value={me.score.total} />} sub="Projected season" accent="var(--red)" />
               <Stat k="Overall rank" v={<>#<CountUp value={me.rank ?? 0} /></>} sub={`Top ${me.percentile}%`} accent="var(--info)" />
               <Stat k="Last race" v={<CountUp value={me.score.last_race_points} />} sub={`Round ${(meta?.next_round ?? 1) - 1}`} accent="var(--gain)" />
-              <Stat k="Captain bonus" v={<CountUp value={me.score.captain_bonus} />} sub="2× multiplier" accent="var(--purple)" />
+              <Stat k="Captain bonus" v={<CountUp value={me.score.captain_bonus} />} sub="1.5× multiplier" accent="var(--purple)" />
             </>
           ) : (
             <div className="panel panel-pad g4" style={{ gridColumn: '1 / -1', textAlign: 'center' }}>
@@ -134,6 +135,13 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Auditable weekend ledger */}
+        {me?.weekend && me.weekend.assets.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <ScoreBreakdown weekend={me.weekend} />
+          </div>
+        )}
 
         {/* Insights */}
         <div style={{ marginTop: 20 }}>

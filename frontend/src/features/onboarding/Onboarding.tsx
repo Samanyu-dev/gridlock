@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ArrowLeft, Check, Shuffle } from 'lucide-react'
 import { Brand } from '../../components/Brand'
@@ -19,7 +19,7 @@ const PERSONAS = [
 
 export default function Onboarding() {
   const navigate = useNavigate()
-  const { setSession, username: existing } = useSession()
+  const { setSession, authed: existing } = useSession()
   const [step, setStep] = useState(0)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -30,6 +30,8 @@ export default function Onboarding() {
   const [favConstructor, setFavConstructor] = useState<number | null>(null)
   const [teamName, setTeamName] = useState('')
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -55,17 +57,19 @@ export default function Onboarding() {
   const finish = async () => {
     setError(''); setBusy(true)
     try {
-      const { profile } = await api.auth({
-        username: username.trim(), persona: persona || undefined,
+      const { profile, access_token } = await api.register({
+        email: email.trim(), password, username: username.trim(),
+        persona: persona || undefined,
         favorite_driver_id: favDrivers[0], favorite_constructor_id: favConstructor || undefined,
         team_name: teamName.trim() || undefined,
       })
-      setSession(profile)
+      setSession(profile, access_token)
       navigate('/team')
     } catch (e) {
       setError((e as Error).message)
     } finally { setBusy(false) }
   }
+  const canFinish = username.length >= 3 && /.+@.+\..+/.test(email) && password.length >= 8
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -183,14 +187,31 @@ export default function Onboarding() {
               )}
 
               {step === 6 && (
-                <Step title="Claim your identity" sub="Pick a username — this is your handle on the grid.">
-                  <input className="input" style={{ fontSize: 18, padding: 16 }} placeholder="username"
-                    value={username} maxLength={20}
-                    onChange={(e) => setUsername(e.target.value.replace(/[^A-Za-z0-9_]/g, ''))}
-                    onKeyDown={(e) => e.key === 'Enter' && username.length >= 3 && finish()} />
-                  <p className="text-faint" style={{ fontSize: 12, marginTop: 8 }}>3–20 characters · letters, numbers, underscores. No password needed for this demo.</p>
+                <Step title="Create your account" sub="Secure your grid with an email and password.">
+                  <div className="col gap-2">
+                    <div>
+                      <label className="label">Username</label>
+                      <input className="input" style={{ fontSize: 16, padding: 14 }} placeholder="username"
+                        value={username} maxLength={20}
+                        onChange={(e) => setUsername(e.target.value.replace(/[^A-Za-z0-9_]/g, ''))} />
+                    </div>
+                    <div>
+                      <label className="label">Email</label>
+                      <input className="input" type="email" style={{ fontSize: 16, padding: 14 }} placeholder="you@example.com"
+                        value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+                    </div>
+                    <div>
+                      <label className="label">Password</label>
+                      <input className="input" type="password" style={{ fontSize: 16, padding: 14 }} placeholder="at least 8 characters"
+                        value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password"
+                        onKeyDown={(e) => e.key === 'Enter' && canFinish && finish()} />
+                    </div>
+                  </div>
+                  <p className="text-faint" style={{ fontSize: 12, marginTop: 10 }}>
+                    Already have an account? <Link to="/login" style={{ color: 'var(--info)' }}>Sign in</Link>.
+                  </p>
                   {error && <div className="chip" style={{ marginTop: 12, color: 'var(--loss)', borderColor: 'var(--loss)' }}>{error}</div>}
-                  <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 20 }} disabled={username.length < 3 || busy} onClick={finish}>
+                  <button className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }} disabled={!canFinish || busy} onClick={finish}>
                     {busy ? 'Building…' : 'Build my first team'} <ArrowRight size={18} />
                   </button>
                 </Step>

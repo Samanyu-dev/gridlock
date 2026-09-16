@@ -13,18 +13,18 @@ import type { Driver, LeaderboardRow, Meta } from '../../lib/types'
 
 export default function Landing() {
   const navigate = useNavigate()
-  const { username } = useSession()
+  const { authed } = useSession()
   const [meta, setMeta] = useState<Meta | null>(null)
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [board, setBoard] = useState<LeaderboardRow[]>([])
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    if (username) { navigate('/home'); return }
+    if (authed) { navigate('/home'); return }
     api.meta().then(setMeta).catch(() => {})
     api.drivers({ sort: 'points' }).then((r) => setDrivers(r.drivers.slice(0, 6))).catch(() => {})
     api.leaderboard({ limit: 4 }).then((r) => setBoard(r.entries)).catch(() => {})
-  }, [username, navigate])
+  }, [authed, navigate])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -50,7 +50,7 @@ export default function Landing() {
             <a href="#weekend">Races</a><a href="#leaderboard">Leagues</a><a href="#how">How It Works</a>
           </nav>
           <div className="row gap-2">
-            <Link to="/onboarding" className="btn btn-ghost btn-sm">Sign In</Link>
+            <Link to="/login" className="btn btn-ghost btn-sm">Sign In</Link>
             <Link to="/onboarding" className="btn btn-primary btn-sm">Play Now</Link>
           </div>
         </div>

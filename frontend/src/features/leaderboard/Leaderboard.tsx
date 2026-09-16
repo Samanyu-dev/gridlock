@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Delta, Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
-import { useSession } from '../../lib/session'
 import { flagEmoji } from '../../lib/format'
 import type { LeaderboardRow } from '../../lib/types'
 
@@ -9,7 +8,6 @@ const TABS = ['Overall', 'Race', 'Country', 'Friends']
 const PAGE = 25
 
 export default function Leaderboard() {
-  const { username } = useSession()
   const [rows, setRows] = useState<LeaderboardRow[]>([])
   const [me, setMe] = useState<LeaderboardRow | null>(null)
   const [total, setTotal] = useState(0)
@@ -19,10 +17,10 @@ export default function Leaderboard() {
 
   useEffect(() => {
     setLoading(true)
-    api.leaderboard({ offset, limit: PAGE, username: username || undefined })
+    api.leaderboard({ offset, limit: PAGE })
       .then((r) => { setRows(r.entries); setMe(r.me); setTotal(r.total) })
       .catch(() => {}).finally(() => setLoading(false))
-  }, [offset, username])
+  }, [offset])
 
   const sortKey = tab === 'Race' ? 'last_race' : 'total'
   const display = tab === 'Race' ? [...rows].sort((a, b) => b.last_race - a.last_race) : rows

@@ -18,47 +18,44 @@ from .season import Season
 
 UTC = timezone.utc
 
-CAPTAIN_MULTIPLIER = 2
+CAPTAIN_MULTIPLIER = 1.5
 BUDGET = 100.0
 ROSTER = {"drivers": 5, "constructors": 2}
 FREE_TRANSFERS = 2
-EXTRA_TRANSFER_COST = 4
+MAX_STORED_TRANSFERS = 4
+EXTRA_TRANSFER_COST = 5
 
 
 # --------------------------------------------------------------------------- #
 # Tactical boosts (config-driven; would live in a DB table in production).
 # --------------------------------------------------------------------------- #
 
+# Tactical boosts (V3). Availability + usage are persisted per profile and
+# activation is locked at the deadline. Config-driven so values can change.
 BOOSTS = [
     {
         "id": "turbo", "name": "Turbo", "icon": "zap",
-        "description": "One driver scores 3× fantasy points for the weekend.",
-        "usage_limit": 2, "scoring_modifier": {"type": "driver_multiplier", "value": 3},
+        "description": "A selected non-captain driver scores 2× for the weekend.",
+        "usage_limit": 2, "scoring_modifier": {"type": "driver_multiplier", "value": 2.0},
         "activation_period": "weekend",
     },
     {
-        "id": "double-stack", "name": "Double Stack", "icon": "layers",
-        "description": "Both constructors score an enhanced 1.5× multiplier.",
+        "id": "pit-wall", "name": "Pit Wall", "icon": "layers",
+        "description": "A selected constructor scores 1.5× for the weekend.",
         "usage_limit": 2, "scoring_modifier": {"type": "constructor_multiplier", "value": 1.5},
         "activation_period": "weekend",
     },
     {
-        "id": "no-limit", "name": "No Limit", "icon": "infinity",
-        "description": "Ignore the budget cap for a single race weekend.",
-        "usage_limit": 1, "scoring_modifier": {"type": "budget_override"},
-        "activation_period": "weekend",
-    },
-    {
         "id": "wildcard", "name": "Wildcard", "icon": "shuffle",
-        "description": "Unlimited free transfers for one race weekend.",
-        "usage_limit": 2, "scoring_modifier": {"type": "unlimited_transfers"},
-        "activation_period": "weekend",
+        "description": "Unlimited free permanent transfers for one round.",
+        "usage_limit": 1, "scoring_modifier": {"type": "unlimited_permanent_transfers"},
+        "activation_period": "round",
     },
     {
-        "id": "pit-stop", "name": "Pit Stop", "icon": "wrench",
-        "description": "One free emergency substitution after the deadline.",
-        "usage_limit": 1, "scoring_modifier": {"type": "free_sub"},
-        "activation_period": "post_deadline",
+        "id": "free-hit", "name": "Free Hit", "icon": "infinity",
+        "description": "Unlimited temporary transfers for one round; your team reverts after.",
+        "usage_limit": 1, "scoring_modifier": {"type": "temporary_transfers"},
+        "activation_period": "round",
     },
 ]
 

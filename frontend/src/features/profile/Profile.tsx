@@ -18,15 +18,15 @@ const ACHIEVEMENTS = [
 ]
 
 export default function Profile() {
-  const { username, profile, theme, toggleTheme, clear } = useSession()
+  const { authed, profile, theme, toggleTheme, clear } = useSession()
   const navigate = useNavigate()
   const [me, setMe] = useState<MeResponse | null>(null)
   const [fav, setFav] = useState<Driver | null>(null)
 
   useEffect(() => {
-    if (username) api.me(username).then(setMe).catch(() => {})
+    if (authed) api.me().then(setMe).catch(() => {})
     if (profile?.favorite_driver_id) api.drivers().then((r) => setFav(r.drivers.find((d) => d.id === profile.favorite_driver_id) || null)).catch(() => {})
-  }, [username, profile])
+  }, [authed, profile])
 
   if (!profile) return <div className="page container"><Skeleton h={200} /></div>
 

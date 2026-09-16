@@ -59,10 +59,16 @@ class RealMotorsportProvider(MotorsportDataProvider):
         )
 
 
-_PROVIDERS = {
-    "mock": MockMotorsportProvider,
-    "real": RealMotorsportProvider,
-}
+def _provider_classes():
+    # Imported lazily so a missing optional dep never breaks the mock path.
+    providers = {"mock": MockMotorsportProvider, "real": RealMotorsportProvider}
+    try:
+        from .openf1 import OpenF1Provider
+        providers["openf1"] = OpenF1Provider
+    except Exception:  # pragma: no cover - defensive
+        pass
+    return providers
+
 
 _INSTANCE: Optional[MotorsportDataProvider] = None
 
@@ -71,10 +77,10 @@ def get_provider() -> MotorsportDataProvider:
     global _INSTANCE
     if _INSTANCE is None:
         key = os.environ.get("MOTORSPORT_DATA_PROVIDER", "mock").lower()
-        cls = _PROVIDERS.get(key, MockMotorsportProvider)
+        cls = _provider_classes().get(key, MockMotorsportProvider)
         _INSTANCE = cls()
     return _INSTANCE
 
 
 def available_providers() -> List[str]:
-    return list(_PROVIDERS.keys())
+    return list(_provider_classes().keys())

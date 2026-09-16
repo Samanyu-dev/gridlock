@@ -73,13 +73,23 @@ export interface Meta {
 }
 
 export interface Profile {
-  id: number; username: string; display_name: string; team_name: string
+  id: number; username: string; email: string | null; email_verified?: boolean; is_admin?: boolean
+  display_name: string; team_name: string
   persona: string | null; country: string | null
   favorite_driver_id: number | null; favorite_constructor_id: number | null; public_profile: boolean
 }
 export interface TeamState {
   driver_ids: number[]; constructor_ids: number[]; captain_id: number | null
-  active_boost: string | null; free_transfers: number
+  active_boost: string | null; boost_driver_id?: number | null; boost_constructor_id?: number | null
+  free_transfers: number; team_value?: number; bank?: number
+}
+export interface LedgerEntry { rule_code: string; phase: string; tag: string; label: string; points: number; base_points?: number; multiplier?: number }
+export interface WeekendAsset {
+  ref: string; name: string; short: string; color: string
+  base: number; multiplier: number; subtotal: number; entries: LedgerEntry[]
+}
+export interface WeekendScore {
+  total: number; state: string; round: number; assets: WeekendAsset[]; from_snapshot?: boolean
 }
 export interface TeamScore {
   total: number; drivers_points: number; constructors_points: number; captain_bonus: number
@@ -88,6 +98,7 @@ export interface TeamScore {
 export interface MeResponse {
   profile: Profile; team: TeamState | null
   score?: TeamScore; rank?: number; field_size?: number; percentile?: number
+  weekend?: WeekendScore
 }
 
 export interface LeaderboardRow {

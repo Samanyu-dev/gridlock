@@ -7,7 +7,7 @@ import { useSession } from '../../lib/session'
 import type { LeagueSummary } from '../../lib/types'
 
 export default function Leagues() {
-  const { username } = useSession()
+  const { authed } = useSession()
   const navigate = useNavigate()
   const [pub, setPub] = useState<LeagueSummary[]>([])
   const [mine, setMine] = useState<LeagueSummary[]>([])
@@ -19,20 +19,20 @@ export default function Leagues() {
   const [type, setType] = useState('classic')
   const [err, setErr] = useState('')
 
-  const load = () => { if (username) api.leagues(username).then((r) => { setPub(r.public); setMine(r.mine) }).catch(() => {}) }
-  useEffect(load, [username])
+  const load = () => { if (authed) api.leagues().then((r) => { setPub(r.public); setMine(r.mine) }).catch(() => {}) }
+  useEffect(load, [authed])
 
   const create = async () => {
     setErr('')
     try {
-      const r = await api.createLeague({ username: username!, name, description: desc, privacy, type })
+      const r = await api.createLeague({ name, description: desc, privacy, type })
       navigate(`/leagues/${r.code}`)
     } catch (e) { setErr((e as Error).message) }
   }
   const join = async () => {
     setErr('')
     try {
-      const r = await api.joinLeague({ username: username!, code: joinCode.trim().toUpperCase() })
+      const r = await api.joinLeague({ code: joinCode.trim().toUpperCase() })
       navigate(`/leagues/${r.code}`)
     } catch (e) { setErr((e as Error).message) }
   }

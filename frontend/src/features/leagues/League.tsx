@@ -3,17 +3,15 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Copy, Check, Share2 } from 'lucide-react'
 import { Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
-import { useSession } from '../../lib/session'
 import { flagEmoji } from '../../lib/format'
 import type { LeagueDetail } from '../../lib/types'
 
 export default function League() {
   const { code } = useParams()
-  const { username } = useSession()
   const [lg, setLg] = useState<LeagueDetail | null>(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => { if (code) api.league(code, username || undefined).then(setLg).catch(() => {}) }, [code, username])
+  useEffect(() => { if (code) api.league(code).then(setLg).catch(() => {}) }, [code])
 
   const copy = () => {
     navigator.clipboard?.writeText(lg!.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }).catch(() => {})
