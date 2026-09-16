@@ -1,149 +1,68 @@
-import { useEffect, useState } from 'react'
-import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
-import { UserProvider, useUser } from './UserContext'
-import { api } from './api'
-import { soccerApi } from './soccer/api'
-import RankBadge from './components/RankBadge'
-import Home from './pages/Home'
-import Sports from './pages/Sports'
-import Lobby from './pages/Lobby'
-import Draft from './pages/Draft'
-import Team from './pages/Team'
-import Leaderboard from './pages/Leaderboard'
-import SoccerLobby from './soccer/SoccerLobby'
-import SoccerDraft from './soccer/SoccerDraft'
-import SoccerTeam from './soccer/SoccerTeam'
-import SoccerLeaderboard from './soccer/SoccerLeaderboard'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
+import type { ReactNode } from 'react'
+import { SessionProvider, useSession } from './lib/session'
+import { MetaProvider } from './lib/meta'
+import { AppShell } from './components/AppShell'
+import Landing from './features/landing/Landing'
+import Onboarding from './features/onboarding/Onboarding'
+import Dashboard from './features/dashboard/Dashboard'
+import TeamBuilder from './features/team/TeamBuilder'
+import Drivers from './features/drivers/Drivers'
+import DriverProfile from './features/drivers/DriverProfile'
+import Constructors from './features/constructors/Constructors'
+import ConstructorProfile from './features/constructors/ConstructorProfile'
+import Races from './features/races/Races'
+import RaceDetail from './features/races/RaceDetail'
+import Live from './features/live/Live'
+import Leagues from './features/leagues/Leagues'
+import League from './features/leagues/League'
+import Leaderboard from './features/leaderboard/Leaderboard'
+import Rules from './features/rules/Rules'
+import Profile from './features/profile/Profile'
+import More from './features/profile/More'
 
-function RequireUser({ children }: { children: React.ReactNode }) {
-  const { username } = useUser()
-  if (!username) return <Navigate to="/" replace />
-  return <>{children}</>
+function RequireUser({ children }: { children: ReactNode }) {
+  const { username } = useSession()
+  const loc = useLocation()
+  if (!username) return <Navigate to="/" replace state={{ from: loc.pathname }} />
+  return <AppShell>{children}</AppShell>
 }
 
-function Shell() {
-  const { username, setUsername, tournament, sport } = useUser()
+function AppRoutes() {
   const location = useLocation()
-  const [elo, setElo] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!username) {
-      setElo(null)
-      return
-    }
-    const client = sport === 'soccer' ? soccerApi : api
-    client.getUser(username, tournament).then((u) => setElo(u.elo_rating))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username, tournament, sport, location.pathname])
-
-  const draftPath = sport === 'soccer' ? `/soccer/draft?tournament=${tournament}` : `/draft?tournament=${tournament}`
-  const teamPath = sport === 'soccer' ? `/soccer/team?tournament=${tournament}` : `/team?tournament=${tournament}`
-  const leaderboardPath =
-    sport === 'soccer' ? `/soccer/leaderboard?tournament=${tournament}` : `/leaderboard?tournament=${tournament}`
-
   return (
-    <div className="shell">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">{sport === 'soccer' ? '⚽' : '🏏'}</span> DraftWars
-        </div>
-        <nav>
-          <NavLink to="/sports" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Sports
-          </NavLink>
-          <NavLink to={draftPath} className={({ isActive }) => (isActive ? 'active' : '')}>
-            Draft
-          </NavLink>
-          <NavLink to={teamPath} className={({ isActive }) => (isActive ? 'active' : '')}>
-            My XI
-          </NavLink>
-          <NavLink to={leaderboardPath} className={({ isActive }) => (isActive ? 'active' : '')}>
-            Leaderboard
-          </NavLink>
-        </nav>
-        <div className="user-chip">
-          {username ? (
-            <>
-              {elo !== null && <RankBadge elo={elo} size="sm" />}
-              <span>{username}</span>
-              <button className="link-btn" onClick={() => setUsername(null)}>
-                switch
-              </button>
-            </>
-          ) : null}
-        </div>
-      </header>
-      <main>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route
-            path="/sports"
-            element={
-              <RequireUser>
-                <Sports />
-              </RequireUser>
-            }
-          />
-          <Route
-            path="/lobby"
-            element={
-              <RequireUser>
-                <Lobby />
-              </RequireUser>
-            }
-          />
-          <Route
-            path="/draft"
-            element={
-              <RequireUser>
-                <Draft />
-              </RequireUser>
-            }
-          />
-          <Route
-            path="/team"
-            element={
-              <RequireUser>
-                <Team />
-              </RequireUser>
-            }
-          />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route
-            path="/soccer/lobby"
-            element={
-              <RequireUser>
-                <SoccerLobby />
-              </RequireUser>
-            }
-          />
-          <Route
-            path="/soccer/draft"
-            element={
-              <RequireUser>
-                <SoccerDraft />
-              </RequireUser>
-            }
-          />
-          <Route
-            path="/soccer/team"
-            element={
-              <RequireUser>
-                <SoccerTeam />
-              </RequireUser>
-            }
-          />
-          <Route path="/soccer/leaderboard" element={<SoccerLeaderboard />} />
-        </Routes>
-      </main>
-    </div>
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname.split('/').slice(0, 2).join('/')}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/home" element={<RequireUser><Dashboard /></RequireUser>} />
+        <Route path="/team" element={<RequireUser><TeamBuilder /></RequireUser>} />
+        <Route path="/drivers" element={<RequireUser><Drivers /></RequireUser>} />
+        <Route path="/drivers/:slug" element={<RequireUser><DriverProfile /></RequireUser>} />
+        <Route path="/constructors" element={<RequireUser><Constructors /></RequireUser>} />
+        <Route path="/constructors/:slug" element={<RequireUser><ConstructorProfile /></RequireUser>} />
+        <Route path="/races" element={<RequireUser><Races /></RequireUser>} />
+        <Route path="/races/:slug" element={<RequireUser><RaceDetail /></RequireUser>} />
+        <Route path="/live" element={<RequireUser><Live /></RequireUser>} />
+        <Route path="/leagues" element={<RequireUser><Leagues /></RequireUser>} />
+        <Route path="/leagues/:code" element={<RequireUser><League /></RequireUser>} />
+        <Route path="/leaderboard" element={<RequireUser><Leaderboard /></RequireUser>} />
+        <Route path="/rules" element={<RequireUser><Rules /></RequireUser>} />
+        <Route path="/profile" element={<RequireUser><Profile /></RequireUser>} />
+        <Route path="/more" element={<RequireUser><More /></RequireUser>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </AnimatePresence>
   )
 }
 
 export default function App() {
   return (
-    <UserProvider>
-      <Shell />
-    </UserProvider>
+    <SessionProvider>
+      <MetaProvider>
+        <AppRoutes />
+      </MetaProvider>
+    </SessionProvider>
   )
 }

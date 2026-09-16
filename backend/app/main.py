@@ -2,9 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
-from .routers import players, users, drafts, simulate, leaderboard, draft, tournaments, matches, soccer
+from .gridlock import models as gl_models  # noqa: F401 - registers tables
+from .gridlock.router import router as gridlock_router
 
-app = FastAPI(title="DraftWars API")
+app = FastAPI(title="GRIDLOCK API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,15 +23,7 @@ def on_startup():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "product": "GRIDLOCK"}
 
 
-app.include_router(tournaments.router)
-app.include_router(matches.router)
-app.include_router(soccer.router)
-app.include_router(draft.router)
-app.include_router(players.router)
-app.include_router(users.router)
-app.include_router(drafts.router)
-app.include_router(simulate.router)
-app.include_router(leaderboard.router)
+app.include_router(gridlock_router)

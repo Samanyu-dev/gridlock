@@ -1,0 +1,12 @@
+{
+  "name": "GRIDLOCK — Fantasy Motorsport",
+  "short_name": "GRIDLOCK",
+  "description": "Build your grid. Own the weekend.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

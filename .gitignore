@@ -1,5 +1,6 @@
 ## Python
 backend/venv/
+.venv/
 __pycache__/
 *.pyc
 *.db
@@ -18,3 +19,4 @@ frontend/dist/
 ## OS
 .DS_Store
 .env*
+!.env.example
