@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Gauge, Trophy, Users, Radio, Zap, LineChart } from 'lucide-react'
 import { Brand } from '../../components/Brand'
 import { RacingLine } from '../../components/RacingLine'
+import { SpeedBackground } from '../../components/SpeedBackground'
 import { Countdown, CountUp } from '../../components/motion'
 import { Avatar, Delta } from '../../components/bits'
 import { api } from '../../lib/api'
@@ -57,11 +58,12 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section style={{ position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.7 }}>
-          <div style={{ position: 'absolute', top: '18%', left: 0, right: 0 }}><RacingLine height={360} /></div>
+      <section style={{ position: 'relative', overflow: 'hidden', minHeight: '82vh', display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', inset: 0 }} aria-hidden>
+          <SpeedBackground intensity={1.2} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(8,9,11,.55) 0%, rgba(8,9,11,.72) 55%, var(--bg) 100%)' }} />
         </div>
-        <div className="container" style={{ position: 'relative', padding: '64px 20px 40px', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 40, alignItems: 'center' }}>
+        <div className="container" style={{ position: 'relative', padding: '48px 20px 40px', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 40, alignItems: 'center' }}>
           <div>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <span className="chip" style={{ marginBottom: 20 }}>Season {meta?.season ?? 2026} · Free to play</span>

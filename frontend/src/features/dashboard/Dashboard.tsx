@@ -5,6 +5,7 @@ import { ArrowRight, Check, Circle, Sparkles, Flag, TrendingUp } from 'lucide-re
 import { Countdown, CountUp } from '../../components/motion'
 import { Avatar, Skeleton } from '../../components/bits'
 import { ScoreBreakdown } from '../../components/ScoreBreakdown'
+import { SpeedBackground } from '../../components/SpeedBackground'
 import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { useMeta } from '../../lib/meta'
@@ -39,26 +40,40 @@ export default function Dashboard() {
   return (
     <div className="page">
       <div className="container">
-        {/* Hero */}
-        <motion.div className="panel panel-glow" style={{ overflow: 'hidden', marginBottom: 20 }}
+        {/* Hero — broadcast-style, over live motion */}
+        <motion.section className="hero-v2" style={{ minHeight: 320, marginBottom: 20, display: 'flex' }}
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="row between wrap gap-3" style={{ padding: 24, background: 'linear-gradient(120deg, rgba(255,33,48,0.10), transparent 60%)' }}>
-            <div>
-              <span className="eyebrow">Next Race · Round {nr?.round}</span>
-              <h1 className="display" style={{ fontSize: 'clamp(30px,5vw,52px)', margin: '6px 0' }}>
-                {flagEmoji(nr?.country)} {nr ? nr.name : <Skeleton w={280} h={44} />}
-              </h1>
-              <span className="text-dim">{nr?.circuit} · {nr?.location}, {nr?.country_name} · {nr?.weather}</span>
+          <div className="hero-v2__media"><SpeedBackground intensity={1.15} /></div>
+          <div className="hero-v2__scrim" />
+          <div className="hero-v2__content" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 'clamp(22px,3.5vw,44px)' }}>
+            <div className="row between wrap gap-2">
+              <span className="eyebrow" style={{ color: 'var(--text-dim)' }}>Next Race · Round {nr?.round}</span>
+              <span className="live-pill"><span className="dot" /> Race Week</span>
             </div>
-            <div className="col" style={{ alignItems: 'flex-end' }}>
-              <span className="eyebrow" style={{ marginBottom: 10 }}>Team locks in</span>
-              {nr && <Countdown iso={nr.deadline} />}
-              <Link to="/team" className="btn btn-primary btn-sm" style={{ marginTop: 14 }}>
-                {hasTeam ? 'Manage team' : 'Build team'} <ArrowRight size={15} />
-              </Link>
+            <div style={{ marginTop: 'auto' }}>
+              <span className="text-dim" style={{ fontSize: 15 }}>{flagEmoji(nr?.country)} {nr?.location}{nr ? `, ${nr.country_name}` : ''}</span>
+              <h1 className="display" style={{ fontSize: 'clamp(38px,7vw,84px)', margin: '4px 0 2px' }}>
+                {nr ? nr.name : <Skeleton w={320} h={60} />}
+              </h1>
+              <div className="row between wrap gap-3" style={{ marginTop: 20 }}>
+                <div className="row gap-4">
+                  <HeroStat label="Circuit" value={nr?.circuit ?? '—'} />
+                  <HeroStat label="Laps" value={nr?.laps ?? '—'} />
+                  <HeroStat label="Weather" value={nr?.weather ?? '—'} />
+                </div>
+                <div className="row gap-3 wrap" style={{ alignItems: 'flex-end' }}>
+                  <div className="col" style={{ alignItems: 'flex-start' }}>
+                    <span className="eyebrow" style={{ marginBottom: 6 }}>Team locks in</span>
+                    {nr && <Countdown iso={nr.deadline} />}
+                  </div>
+                  <Link to="/team" className="btn btn-primary">
+                    {hasTeam ? 'Manage team' : 'Build team'} <ArrowRight size={16} />
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
-        </motion.div>
+        </motion.section>
 
         {/* Fantasy overview */}
         <div className="grid g4" style={{ marginBottom: 20 }}>
@@ -160,6 +175,15 @@ export default function Dashboard() {
         </div>
       </div>
       <style>{`@media (max-width: 900px){ .dash-grid{ grid-template-columns: 1fr !important; } }`}</style>
+    </div>
+  )
+}
+
+function HeroStat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="col">
+      <span className="eyebrow" style={{ marginBottom: 3 }}>{label}</span>
+      <span className="num" style={{ fontWeight: 700, fontSize: 15 }}>{value}</span>
     </div>
   )
 }
