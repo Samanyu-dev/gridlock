@@ -42,28 +42,31 @@ export default function TeamBuilder() {
 
   const dMap = useMemo(() => new Map(drivers.map((d) => [d.id, d])), [drivers])
   const cMap = useMemo(() => new Map(constructors.map((c) => [c.id, c])), [constructors])
+  const budget = meta?.config.budget ?? 300
   const maxD = meta?.config.roster.drivers ?? 10
   const maxC = meta?.config.roster.constructors ?? 2
 
-  const squadValue = useMemo(() => {
+  const cost = useMemo(() => {
     let c = 0
     selDrivers.forEach((id) => (c += dMap.get(id)?.price ?? 0))
     selConstructors.forEach((id) => (c += cMap.get(id)?.price ?? 0))
     return Math.round(c * 10) / 10
   }, [selDrivers, selConstructors, dMap, cMap])
+  const remaining = Math.round((budget - cost) * 10) / 10
   const complete = selDrivers.length === maxD && selConstructors.length === maxC
+  const warn = remaining < 0
 
   const toggleDriver = (d: Driver) => {
     if (selDrivers.includes(d.id)) {
       setSelDrivers((s) => s.filter((x) => x !== d.id))
       if (captain === d.id) setCaptain(null)
-    } else if (selDrivers.length < maxD) {
+    } else if (selDrivers.length < maxD && remaining - d.price >= -1e-6) {
       setSelDrivers((s) => [...s, d.id])
     }
   }
   const toggleConstructor = (c: Constructor) => {
     if (selConstructors.includes(c.id)) setSelConstructors((s) => s.filter((x) => x !== c.id))
-    else if (selConstructors.length < maxC) setSelConstructors((s) => [...s, c.id])
+    else if (selConstructors.length < maxC && remaining - c.price >= -1e-6) setSelConstructors((s) => [...s, c.id])
   }
 
   const filtered = useMemo(() => {
@@ -106,21 +109,23 @@ export default function TeamBuilder() {
           </div>
         </div>
 
-        {/* Sticky squad-progress bar — no budget cap, just fill the grid. */}
+        {/* Sticky budget bar */}
         <div className="panel panel-pad" style={{ position: 'sticky', top: 68, zIndex: 12, marginBottom: 20 }}>
           <div className="row between wrap gap-2">
             <div className="row gap-4">
-              <div><div className="eyebrow">Squad</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
-                <CountUp value={selDrivers.length + selConstructors.length} /> <span className="text-faint" style={{ fontSize: 14 }}>/ {maxD + maxC}</span></div></div>
-              <div className="hide-mobile"><div className="eyebrow">Squad value</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
-                {money(squadValue)}</div></div>
+              <div><div className="eyebrow">Budget</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
+                {money(cost)} <span className="text-faint" style={{ fontSize: 14 }}>/ {money(budget)}</span></div></div>
+              <div><div className="eyebrow">Remaining</div><div className="num" style={{ fontWeight: 800, fontSize: 22, color: warn ? 'var(--loss)' : 'var(--gain)' }}>
+                <CountUp value={remaining} decimals={1} prefix="$" suffix="M" /></div></div>
+              <div className="hide-mobile"><div className="eyebrow">Squad</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
+                {selDrivers.length + selConstructors.length}/{maxD + maxC}</div></div>
             </div>
-            <button className="btn btn-primary" disabled={!complete || saving} onClick={save}>
+            <button className="btn btn-primary" disabled={!complete || warn || saving} onClick={save}>
               {saving ? 'Saving…' : complete ? 'Save team' : `Add ${maxD - selDrivers.length + maxC - selConstructors.length} more`}
             </button>
           </div>
-          <div className="bar" style={{ marginTop: 12 }}>
-            <span style={{ width: `${Math.min(100, ((selDrivers.length + selConstructors.length) / (maxD + maxC)) * 100)}%` }} />
+          <div className={`bar ${warn ? 'warn' : ''}`} style={{ marginTop: 12 }}>
+            <span style={{ width: `${Math.min(100, (cost / budget) * 100)}%` }} />
           </div>
         </div>
 
@@ -228,7 +233,7 @@ export default function TeamBuilder() {
                 <div className="panel" style={{ overflow: 'hidden' }}>
                   {filtered.map((d) => {
                     const sel = selDrivers.includes(d.id)
-                    const roomLeft = sel || selDrivers.length < maxD
+                    const roomLeft = sel || (selDrivers.length < maxD && remaining - d.price >= -1e-6)
                     return (
                       <div key={d.id} className="row between race-edge" style={{ ['--accent' as string]: d.constructor.color, padding: '10px 12px 10px 16px', borderBottom: '1px solid var(--line-soft)', opacity: roomLeft ? 1 : 0.45 }}>
                         <button className="row gap-2 grow" style={{ background: 'transparent', border: 'none', color: 'var(--text)', textAlign: 'left' }} onClick={() => setDrawer(d.slug)}>
@@ -259,7 +264,7 @@ export default function TeamBuilder() {
               <div className="panel" style={{ overflow: 'hidden' }}>
                 {constructors.map((c) => {
                   const sel = selConstructors.includes(c.id)
-                  const roomLeft = sel || selConstructors.length < maxC
+                  const roomLeft = sel || (selConstructors.length < maxC && remaining - c.price >= -1e-6)
                   return (
                     <div key={c.id} className="row between race-edge" style={{ ['--accent' as string]: c.color, padding: '12px 12px 12px 16px', borderBottom: '1px solid var(--line-soft)', opacity: roomLeft ? 1 : 0.45 }}>
                       <div className="col"><span style={{ fontWeight: 600 }}>{c.name}</span><span className="eyebrow">{c.points} pts · {c.reliability}% reliability · {c.ownership}% owned</span></div>

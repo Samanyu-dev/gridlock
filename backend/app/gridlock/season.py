@@ -224,6 +224,7 @@ class Race:
     dotd_id: Optional[int] = None
     classification: List[dict] = field(default_factory=list)
     quali: List[dict] = field(default_factory=list)
+    circuit_image_url: str = ""
 
 
 @dataclass

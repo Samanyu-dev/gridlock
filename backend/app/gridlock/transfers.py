@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 
 from . import deadlines
 from .models import GLTeam, GLTransfer
-from .store import EXTRA_TRANSFER_COST, FREE_TRANSFERS, MAX_STORED_TRANSFERS, STORE
+from .store import BUDGET, EXTRA_TRANSFER_COST, FREE_TRANSFERS, MAX_STORED_TRANSFERS, STORE
 
 
 class TransferOutcome:
@@ -102,7 +102,7 @@ def save_team(
         team.boost_driver_id = boost_driver_id
         team.boost_constructor_id = boost_constructor_id
         team.team_value = STORE.team_cost(driver_ids, constructor_ids)
-        team.bank = 0.0  # no budget cap — nothing to have "remaining"
+        team.bank = round(BUDGET - team.team_value, 1)
         if not first_pick:
             # Consume free transfers; unused roll over (capped) on round rollover.
             team.free_transfers = max(0, free_available - free_used)

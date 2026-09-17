@@ -71,7 +71,7 @@ export default function Landing() {
                 Build your grid.<br /><span style={{ color: 'var(--red)' }}>Own the weekend.</span>
               </h1>
               <p className="text-dim" style={{ fontSize: 18, maxWidth: 480, lineHeight: 1.5, marginBottom: 28 }}>
-                Draft ten drivers and two constructors — no budget, just picks. Score every practice,
+                Draft ten drivers and two constructors under a $300M budget. Score every practice,
                 qualifying and race. Make the transfers, call the boosts, and climb from the paddock
                 to the top of the global grid.
               </p>
@@ -144,15 +144,15 @@ export default function Landing() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
           <div>
             <span className="eyebrow">The team builder</span>
-            <h2 className="display" style={{ fontSize: 'clamp(28px,4vw,44px)', margin: '10px 0 16px' }}>No budget. Just your top 10.</h2>
+            <h2 className="display" style={{ fontSize: 'clamp(28px,4vw,44px)', margin: '10px 0 16px' }}>$300M. Your top 10.</h2>
             <p className="text-dim" style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 20 }}>
               Ten drivers, two constructors, one captain on double points — laid out like a real
-              starting grid. Pick who you actually think will deliver, front row to back of the pack.
+              starting grid. Spend it on the front row or find value deep in the midfield.
             </p>
             <div className="col gap-2">
               {[
                 ['Fill the grid', 'Ten driver slots, paired up like a real starting grid.'],
-                ['Pick two constructors', 'Reliability and pit-crew pace matter.'],
+                ['Stay under budget', 'A $300M cap — spend it wisely.'],
                 ['Name your captain', 'Double points on the driver you trust.'],
               ].map(([t, d]) => (
                 <div key={t} className="row gap-2 race-edge" style={{ padding: '8px 0 8px 16px' }}>

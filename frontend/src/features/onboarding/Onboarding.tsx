@@ -174,7 +174,7 @@ export default function Onboarding() {
                   <div className="col gap-2">
                     {[
                       ['Pick your lineup', `${meta?.config.roster.drivers ?? 10} drivers, ${meta?.config.roster.constructors ?? 2} constructors.`],
-                      ['No budget to manage', 'Just pick who you think will actually deliver.'],
+                      ['Stay under budget', `You've got ${meta ? money(meta.config.budget) : '$300M'} to spend.`],
                       ['Score every weekend', 'Points for quali, the race, and everything in between.'],
                       ['Make transfers & boosts', 'React to form, injuries and momentum.'],
                       ['Beat your friends', 'Private leagues, head-to-head, global grid.'],

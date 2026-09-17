@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
+import { money } from '../../lib/format'
 import type { Boost, GameConfig } from '../../lib/types'
 
 interface RulesData { config: GameConfig; rules: Record<string, number | Record<string, number>>; boosts: Boost[] }
@@ -43,12 +44,21 @@ export default function Rules() {
 
         <Section title="Your team">
           <ul className="col gap-1" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
-            <li>Pick <strong>{data.config.roster.drivers} drivers</strong> and <strong>{data.config.roster.constructors} constructors</strong> — no budget, just your best picks.</li>
+            <li>Pick <strong>{data.config.roster.drivers} drivers</strong> and <strong>{data.config.roster.constructors} constructors</strong> under a <strong>{money(data.config.budget)}</strong> budget.</li>
             <li>Name one <strong>captain</strong> — they score <strong>{data.config.captain_multiplier}×</strong> points.</li>
             <li>You get <strong>{data.config.free_transfers} free transfer</strong> before each round locks; extra changes cost <strong>{data.config.extra_transfer_cost} pts</strong> each.</li>
             <li>Your team <strong>locks at qualifying</strong>. All validation happens server-side.</li>
             <li>Arm the <strong>Underdog</strong> boost on a driver — if they finish P6–P10, that driver scores double for the round.</li>
           </ul>
+        </Section>
+
+        <Section title="What counts toward a round">
+          <p className="text-dim" style={{ fontSize: 14, lineHeight: 1.6 }}>
+            A round isn't just race day. Every weekend scores <strong>qualifying</strong> (position, plus beating your
+            teammate) and the <strong>race</strong> (finish, positions gained/lost, fastest lap, classification). On the
+            six weekends that run a sprint, the <strong>sprint</strong> result adds its own points on top of the race —
+            it's never a substitute. Practice sessions don't score anything.
+          </p>
         </Section>
 
         <Section title="Worked example">

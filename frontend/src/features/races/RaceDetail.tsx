@@ -30,7 +30,11 @@ export default function RaceDetail() {
               <h1 className="display" style={{ fontSize: 'clamp(30px,5vw,54px)', margin: '4px 0' }}>{flagEmoji(r.country)} {r.name}</h1>
               <span className="text-dim">{r.circuit} · {r.laps} laps · {r.length_km} km · {r.weather}</span>
             </div>
-            <div style={{ width: 260 }}><CircuitTrace seed={r.slug} height={150} /></div>
+            <div style={{ width: 260, height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {r.circuit_image_url
+                ? <img src={r.circuit_image_url} alt={r.circuit} style={{ height: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                : <CircuitTrace seed={r.slug} height={150} />}
+            </div>
           </div>
           {!done && (
             <div className="row between wrap gap-2" style={{ padding: '16px 28px', borderTop: '1px solid var(--line)', background: 'var(--surface-2)' }}>

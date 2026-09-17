@@ -26,6 +26,7 @@ from .scoring import describe_rules
 from .season import COUNTRY_NAMES
 from .store import (
     BOOSTS,
+    BUDGET,
     STORE,
     TEAM_NAME_SUGGESTIONS,
     new_league_code,
@@ -171,7 +172,7 @@ def _race_brief(r) -> dict:
         "country": r.country, "country_name": COUNTRY_NAMES.get(r.country, r.country),
         "circuit": r.circuit, "laps": r.laps, "length_km": r.length_km,
         "is_sprint": r.is_sprint, "race_start": _iso(r.race_start), "deadline": _iso(r.deadline),
-        "weather": r.weather, "status": r.status,
+        "weather": r.weather, "status": r.status, "circuit_image_url": r.circuit_image_url,
         "winner": {"name": winner.name, "short": winner.short} if winner else None,
     }
 
@@ -389,7 +390,7 @@ def validate_team(body: ValidateTeamRequest):
     projected = None
     if ok:
         projected = STORE.score_team(body.driver_ids, body.constructor_ids, body.captain_id)
-    return {"valid": ok, "errors": errors, "cost": cost, "remaining": round(100.0 - cost, 1), "projected": projected}
+    return {"valid": ok, "errors": errors, "cost": cost, "remaining": round(BUDGET - cost, 1), "projected": projected}
 
 
 @router.put("/team")

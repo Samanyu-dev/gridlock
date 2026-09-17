@@ -181,7 +181,21 @@ def _fetch_weekend(client, weekend: List[dict], race_sess: dict) -> dict:
     fl = fastest_lap_driver(client.laps(session_key=skey)) if has_results else None
     pits = pit_rank_map(client.pit(session_key=skey)) if has_results else {}
     weather = client.weather(session_key=skey) if has_results else []
-    return {"results": results, "grid": grid, "quali": quali, "has_results": has_results, "fl": fl, "pits": pits, "weather": weather}
+
+    # Sprint weekend: the sprint race and its own grid score separately.
+    sprint_sess = next((s for s in weekend if (s.get("session_name") or "") == "Sprint"), None)
+    sprint_results: Dict[int, dict] = {}
+    sprint_grid: Dict[int, int] = {}
+    if sprint_sess:
+        skey2 = sprint_sess.get("session_key")
+        sprint_results = {r.get("driver_number"): r for r in client.session_result(session_key=skey2)}
+        sprint_grid = {g.get("driver_number"): g.get("position") for g in client.starting_grid(session_key=skey2)}
+
+    return {
+        "results": results, "grid": grid, "quali": quali, "has_results": has_results,
+        "fl": fl, "pits": pits, "weather": weather,
+        "sprint_results": sprint_results, "sprint_grid": sprint_grid,
+    }
 
 
 def normalize_season(client, year: int) -> Optional[Season]:
@@ -235,7 +249,7 @@ def normalize_season(client, year: int) -> Optional[Season]:
             weekends.append((rnd, meeting, weekend, race_sess))
 
     fetched: Dict[int, dict] = {}
-    with ThreadPoolExecutor(max_workers=min(12, len(weekends) or 1)) as pool:
+    with ThreadPoolExecutor(max_workers=min(8, len(weekends) or 1)) as pool:
         futures = {pool.submit(_fetch_weekend, client, weekend, race_sess): rnd for rnd, _, weekend, race_sess in weekends}
         for future in as_completed(futures):
             fetched[futures[future]] = future.result()
@@ -249,6 +263,7 @@ def normalize_season(client, year: int) -> Optional[Season]:
         data = fetched[rnd]
         results, grid, quali = data["results"], data["grid"], data["quali"]
         has_results, fl, pits = data["has_results"], data["fl"], data["pits"]
+        sprint_results, sprint_grid = data["sprint_results"], data["sprint_grid"]
 
         # Only score drivers OpenF1 actually reports a result row for this
         # weekend — a missing row means missing data, not a DNS penalty.
@@ -259,6 +274,14 @@ def normalize_season(client, year: int) -> Optional[Season]:
             dr[num] = build_driver_result(
                 num, results.get(num), grid.get(num), quali.get(num),
                 is_fastest=(num == fl), is_sprint=False,
+            )
+        sprint_dr: Dict[int, DriverRaceResult] = {}
+        for num in drivers:
+            if num not in sprint_results:
+                continue
+            sprint_dr[num] = build_driver_result(
+                num, sprint_results.get(num), sprint_grid.get(num), None,
+                is_fastest=False, is_sprint=True,
             )
 
         start = _parse_dt(race_sess.get("date_start")) or now
@@ -274,10 +297,17 @@ def normalize_season(client, year: int) -> Optional[Season]:
             for num, result in dr.items():
                 mate = _teammate(num, drivers, dr)
                 bd = engine.score_driver(result, teammate=mate)
+                total = bd.total
+                items = list(bd.items)
+                if num in sprint_dr:
+                    sprint_mate = _teammate(num, drivers, sprint_dr)
+                    sbd = engine.score_driver(sprint_dr[num], teammate=sprint_mate)
+                    total += sbd.total
+                    items += sbd.items
                 d = drivers[num]
-                d.points += bd.total
-                d.round_points[rnd] = bd.total
-                d.round_breakdown[rnd] = bd.items
+                d.points += total
+                d.round_points[rnd] = total
+                d.round_breakdown[rnd] = items
                 d.results[rnd] = {
                     "grid": result.grid, "finish": result.finish, "status": result.status,
                     "quali": result.quali_position, "fastest_lap": result.fastest_lap,
@@ -307,6 +337,7 @@ def normalize_season(client, year: int) -> Optional[Season]:
             sessions=[RaceSession("RACE", "Grand Prix", start)],
             winner_id=_winner(dr), fastest_lap_id=fl,
             classification=_classification(dr, drivers, constructors) if has_results else [],
+            circuit_image_url=meeting.get("circuit_image") or "",
         ))
 
     if with_data == 0:

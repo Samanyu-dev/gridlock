@@ -45,6 +45,7 @@ export interface Race {
   round: number; name: string; slug: string; location: string; country: string; country_name: string
   circuit: string; laps: number; length_km: number; is_sprint: boolean
   race_start: string; deadline: string; weather: string; status: string
+  circuit_image_url: string
   winner: { name: string; short: string } | null
 }
 export interface RaceFull extends Race {
@@ -64,7 +65,7 @@ export interface Boost {
   usage_limit: number; activation_period: string; scoring_modifier: Record<string, unknown>
 }
 export interface GameConfig {
-  roster: { drivers: number; constructors: number }
+  budget: number; roster: { drivers: number; constructors: number }
   captain_multiplier: number; free_transfers: number; extra_transfer_cost: number
   rules: Record<string, unknown>; boosts: Boost[]
 }
@@ -115,16 +116,13 @@ export interface LeagueDetail extends LeagueSummary {
 
 export interface Insight { type: string; text: string; demo: boolean }
 
-export interface LiveBoardRow {
-  position: number; driver_id: number; short: string; name: string; number: number
-  constructor: string; color: string; image_url: string; gap: string; tyre: string; pits: number; delta: number
-  fantasy: number
+export interface LiveRaceBrief {
+  name: string; location: string; country: string; circuit: string; weather: string
+  deadline: string | null; race_start: string | null
 }
-export interface LiveEvent { lap: number; short: string; color: string; points: number; label: string }
 export interface LiveSnapshot {
-  demo: boolean
-  race: { name: string; location: string; country: string; circuit: string; weather: string }
-  status: string; lap: number; total_laps: number; track_status: string
-  board: LiveBoardRow[]; events: LiveEvent[]
+  live: boolean
+  race: LiveRaceBrief | null
+  reason?: string
 }
 export interface SearchResult { type: string; label: string; slug: string; meta: string }

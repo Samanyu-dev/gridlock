@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.request
 from typing import List, Optional
 from urllib.parse import urlencode
@@ -45,12 +46,21 @@ class OpenF1Client:
         if qs:
             url += f"?{qs}"
         req = urllib.request.Request(url, headers=self._headers())
-        try:
-            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:  # noqa: S310 (trusted host)
-                data = json.loads(resp.read().decode("utf-8"))
-                return data if isinstance(data, list) else [data]
-        except Exception:
-            return []
+        # The sandbox is flaky: the same query sometimes comes back empty, then
+        # returns the real rows moments later. Retry a couple times before
+        # treating an empty response as "no data" rather than "try again".
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:  # noqa: S310 (trusted host)
+                    data = json.loads(resp.read().decode("utf-8"))
+                    rows = data if isinstance(data, list) else [data]
+                    if rows or attempt == 2:
+                        return rows
+            except Exception:
+                if attempt == 2:
+                    return []
+            time.sleep(0.4 * (attempt + 1))
+        return []
 
     def _headers(self) -> dict:
         h = {"Accept": "application/json", "User-Agent": "GRIDLOCK/1.0"}

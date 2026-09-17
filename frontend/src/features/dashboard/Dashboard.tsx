@@ -86,7 +86,13 @@ export default function Dashboard() {
               <span className="eyebrow">Overview</span>
               <span className="eyebrow">{nr?.is_sprint ? 'Sprint' : 'Grand Prix'}</span>
             </div>
-            {nr && <div style={{ margin: '6px -4px 4px' }}><CircuitTrace seed={nr.slug} height={110} /></div>}
+            {nr && (
+              <div style={{ margin: '6px -4px 4px', height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {nr.circuit_image_url
+                  ? <img src={nr.circuit_image_url} alt={nr.circuit} style={{ height: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                  : <CircuitTrace seed={nr.slug} height={110} />}
+              </div>
+            )}
             <div className="eyebrow" style={{ marginBottom: 2 }}>Track name</div>
             <div className="section-title" style={{ fontSize: 16, marginBottom: 10 }}>{nr?.circuit ?? '—'}</div>
             <div className="row between">

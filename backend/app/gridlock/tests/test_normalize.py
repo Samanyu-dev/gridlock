@@ -109,3 +109,30 @@ def test_normalize_season_end_to_end_with_fixtures():
     # drivers with no result row this round (everyone else) are simply DNS,
     # never invented — no points, no crash.
     assert season.drivers[16].points == 0
+
+
+class _FakeSprintClient(_FakeClient):
+    """Same fixture weekend, but with a Sprint session too."""
+    def sessions(self, **p):
+        return super().sessions(**p) + [
+            {"session_key": 88, "meeting_key": 10, "session_name": "Sprint"},
+        ]
+    def session_result(self, **p):
+        if p.get("session_key") == 88:  # sprint: driver 44 beats driver 1
+            return [{"driver_number": 44, "position": 1}, {"driver_number": 1, "position": 2}]
+        return super().session_result(**p)
+    def starting_grid(self, **p):
+        if p.get("session_key") == 88:
+            return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}]
+        return super().starting_grid(**p)
+
+
+def test_normalize_season_adds_sprint_points_on_top_of_race():
+    race_only = normalize_season(_FakeClient(), 2026)
+    with_sprint = normalize_season(_FakeSprintClient(), 2026)
+    assert with_sprint is not None and race_only is not None
+    # Driver 44 (Hamilton) gained a sprint win (P2 -> P1) on top of the same
+    # race result, so their round total goes up.
+    assert with_sprint.drivers[44].points > race_only.drivers[44].points
+    labels = [e["label"] for e in with_sprint.drivers[44].round_breakdown[1]]
+    assert any("Sprint" in label for label in labels)

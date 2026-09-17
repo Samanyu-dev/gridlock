@@ -9,7 +9,7 @@ these demo managers.
 from __future__ import annotations
 
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
 from .provider import get_provider
@@ -19,6 +19,7 @@ from .season import Season
 UTC = timezone.utc
 
 CAPTAIN_MULTIPLIER = 1.5
+BUDGET = 300.0
 ROSTER = {"drivers": 10, "constructors": 2}
 FREE_TRANSFERS = 1
 MAX_STORED_TRANSFERS = 1
@@ -123,8 +124,7 @@ class GameStore:
     def validate_team(
         self, driver_ids: List[int], constructor_ids: List[int], captain_id: Optional[int]
     ) -> Tuple[bool, List[str]]:
-        """Authoritative, server-side team validation. Budget is unlimited — the
-        only constraints are roster size and picking real, distinct assets."""
+        """Authoritative, server-side team validation."""
         s = self.season
         errors: List[str] = []
         if len(driver_ids) != ROSTER["drivers"]:
@@ -143,6 +143,9 @@ class GameStore:
                 errors.append(f"Unknown constructor {c}.")
         if captain_id is not None and captain_id not in driver_ids:
             errors.append("Captain must be one of your selected drivers.")
+        cost = self.team_cost(driver_ids, constructor_ids)
+        if cost > BUDGET + 1e-6:
+            errors.append(f"Over budget: ${cost:.1f}M of ${BUDGET:.0f}M.")
         return (len(errors) == 0, errors)
 
     # -- insights engine (deterministic, no LLM) -----------------------------
@@ -191,85 +194,37 @@ class GameStore:
     # -- live race snapshot --------------------------------------------------
 
     def live_snapshot(self) -> dict:
-        """A deterministic 'race in progress' snapshot for the Live centre.
+        """The Live centre's state — real only. A Grand Prix runs for roughly
+        2 hours; outside that window (true almost all the time for a hobby
+        league) there is nothing to fabricate, so this reports "not live"
+        with a real countdown instead of synthesizing a fake race.
 
-        In a real deployment this is fed by the provider's live-timing stream;
-        here we synthesize a believable mid-race state so /live is compelling.
+        ponytail: no real live-timing poll (OpenF1 position/intervals) is
+        wired up for the rare case a session genuinely is in progress —
+        add it if someone's actually watching live and it matters.
         """
         s = self.season
         race = s.next_race
-        rng = random.Random(SEASON_LIVE_SEED)
-        drivers = list(s.drivers.values())
+        now = datetime.now(timezone.utc)
+        race_start = race.race_start if race else None
+        if race_start and race_start.tzinfo is None:
+            race_start = race_start.replace(tzinfo=timezone.utc)
+        is_live = bool(race_start and race_start <= now <= race_start + timedelta(hours=2, minutes=30))
 
-        # Order by a strength proxy with noise → current running order.
-        def strength(d):
-            c = s.constructors[d.constructor_id]
-            return d.skill * 0.6 + c.pace * 40 + rng.gauss(0, 5)
-        order = sorted(drivers, key=strength, reverse=True)
+        race_brief = None
+        if race:
+            race_brief = {
+                "name": race.name, "location": race.location, "country": race.country,
+                "circuit": race.circuit, "weather": race.weather,
+                "deadline": race.deadline.isoformat() if race.deadline else None,
+                "race_start": race.race_start.isoformat() if race.race_start else None,
+            }
+        if not is_live:
+            return {"live": False, "race": race_brief}
 
-        total_laps = race.laps if race else 57
-        current_lap = int(total_laps * 0.68)
-        compounds = ["S", "M", "H", "I"]
-        race_points = DEFAULT_SCORING_RULES["race_points"]  # type: ignore[index]
-        gap = 0.0
-        board = []
-        for i, d in enumerate(order):
-            c = s.constructors[d.constructor_id]
-            if i > 0:
-                gap += rng.uniform(0.6, 3.2)
-            position = i + 1
-            # Live fantasy projection: "if it finished now" — current-position
-            # race points, from the same scoring config the final ledger uses.
-            fantasy = int(race_points.get(position, 0))
-            board.append({
-                "position": position,
-                "driver_id": d.id,
-                "short": d.short,
-                "name": d.name,
-                "number": d.number,
-                "constructor": c.name,
-                "color": c.color,
-                "image_url": d.image_url,
-                "gap": "LEADER" if i == 0 else f"+{gap:.3f}",
-                "tyre": rng.choice(compounds),
-                "pits": rng.randint(1, 2),
-                "delta": rng.randint(-4, 5),
-                "fantasy": fantasy,
-            })
-
-        # Live fantasy event feed.
-        events = []
-        for lap in range(current_lap, current_lap - 6, -1):
-            d = rng.choice(order[:12])
-            kind = rng.choice(["overtake", "fastest_lap", "pit", "gain"])
-            if kind == "overtake":
-                events.append({"lap": lap, "short": d.short, "color": s.constructors[d.constructor_id].color, "points": 2, "label": "Position gained"})
-            elif kind == "fastest_lap":
-                events.append({"lap": lap, "short": d.short, "color": s.constructors[d.constructor_id].color, "points": 5, "label": "Fastest lap"})
-            elif kind == "pit":
-                events.append({"lap": lap, "short": d.short, "color": s.constructors[d.constructor_id].color, "points": 0, "label": "Pit stop"})
-            else:
-                events.append({"lap": lap, "short": d.short, "color": s.constructors[d.constructor_id].color, "points": 3, "label": "Overtake"})
-
-        return {
-            "demo": True,
-            "race": {
-                "name": race.name if race else "Grand Prix",
-                "location": race.location if race else "",
-                "country": race.country if race else "",
-                "circuit": race.circuit if race else "",
-                "weather": race.weather if race else "Dry · Warm",
-            },
-            "status": "LIVE",
-            "lap": current_lap,
-            "total_laps": total_laps,
-            "track_status": "GREEN",
-            "board": board,
-            "events": events,
-        }
-
-
-SEASON_LIVE_SEED = 555
+        # A session is genuinely in its live window, but there's no real-time
+        # feed wired up yet — say so rather than fabricating a running order.
+        return {"live": False, "race": race_brief, "reason": "Live timing isn't wired up yet — check back once it's finished."}
 
 
 def _league_code(rng: random.Random) -> str:
@@ -286,6 +241,7 @@ STORE = GameStore()
 
 def scoring_config() -> dict:
     return {
+        "budget": BUDGET,
         "roster": ROSTER,
         "captain_multiplier": CAPTAIN_MULTIPLIER,
         "free_transfers": FREE_TRANSFERS,
