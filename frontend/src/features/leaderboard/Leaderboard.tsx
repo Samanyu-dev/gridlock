@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Delta, Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
+import { useMeta } from '../../lib/meta'
 import { flagEmoji } from '../../lib/format'
 import type { LeaderboardRow } from '../../lib/types'
 
@@ -8,29 +9,38 @@ const TABS = ['Overall', 'Race', 'Country', 'Friends']
 const PAGE = 25
 
 export default function Leaderboard() {
+  const meta = useMeta()
   const [rows, setRows] = useState<LeaderboardRow[]>([])
   const [me, setMe] = useState<LeaderboardRow | null>(null)
   const [total, setTotal] = useState(0)
   const [offset, setOffset] = useState(0)
   const [tab, setTab] = useState('Overall')
   const [loading, setLoading] = useState(true)
+  const currentRound = (meta?.next_round ?? 1) - 1
 
   useEffect(() => {
+    if (tab === 'Country' || tab === 'Friends') return
     setLoading(true)
-    api.leaderboard({ offset, limit: PAGE })
-      .then((r) => { setRows(r.entries); setMe(r.me); setTotal(r.total) })
-      .catch(() => {}).finally(() => setLoading(false))
-  }, [offset])
+    if (tab === 'Race') {
+      api.leaderboardRound(currentRound, { offset, limit: PAGE })
+        .then((r) => { setRows(r.entries); setMe(r.me); setTotal(r.total) })
+        .catch(() => {}).finally(() => setLoading(false))
+    } else {
+      api.leaderboard({ offset, limit: PAGE })
+        .then((r) => { setRows(r.entries); setMe(r.me); setTotal(r.total) })
+        .catch(() => {}).finally(() => setLoading(false))
+    }
+  }, [offset, tab, currentRound])
 
   const sortKey = tab === 'Race' ? 'last_race' : 'total'
-  const display = tab === 'Race' ? [...rows].sort((a, b) => b.last_race - a.last_race) : rows
+  const display = rows
 
   return (
     <div className="page">
       <div className="container">
         <div className="page-head"><span className="eyebrow">The global grid · {total.toLocaleString()} managers</span><h1 className="page-title">Leaderboard</h1></div>
         <div className="seg" style={{ marginBottom: 16 }}>
-          {TABS.map((t) => <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>{t}</button>)}
+          {TABS.map((t) => <button key={t} className={tab === t ? 'active' : ''} onClick={() => { setTab(t); setOffset(0) }}>{t}</button>)}
         </div>
 
         {(tab === 'Country' || tab === 'Friends') ? (

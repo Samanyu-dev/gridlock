@@ -82,6 +82,20 @@ def now() -> datetime:
     return datetime.now(UTC)
 
 
+def rank_with_ties(rows: List[dict], key: str) -> None:
+    """Assign competition ranking (1, 2, 2, 4, ...) in place — equal scores on
+    ``key`` (already sorted desc) share the same rank, per the leaderboard
+    tiebreaker rule "equal score => same rank"."""
+    prev_value = None
+    prev_rank = 0
+    for i, row in enumerate(rows):
+        value = row[key]
+        if value != prev_value:
+            prev_rank = i + 1
+            prev_value = value
+        row["rank"] = prev_rank
+
+
 # --------------------------------------------------------------------------- #
 # Season cache + derived state.
 # --------------------------------------------------------------------------- #
@@ -208,8 +222,7 @@ class GameStore:
                 "movement": rng.randint(-8, 12),
             })
         managers.sort(key=lambda m: m["total"], reverse=True)
-        for i, m in enumerate(managers):
-            m["rank"] = i + 1
+        rank_with_ties(managers, "total")
         return managers
 
     def rank_for_total(self, total: int) -> Tuple[int, int]:
@@ -217,6 +230,17 @@ class GameStore:
         managers = self.managers()
         rank = 1 + sum(1 for m in managers if m["total"] > total)
         return rank, len(managers) + 1
+
+    def round_leaderboard(self, offset: int = 0, limit: int = 25) -> List[dict]:
+        """This-round-only ranking (spec: RACE LEADERBOARD), ties sharing a rank."""
+        rows = [dict(m) for m in self.managers()]
+        rows.sort(key=lambda m: m["last_race"], reverse=True)
+        rank_with_ties(rows, "last_race")
+        return rows[offset: offset + limit]
+
+    def rank_for_round(self, points: float) -> int:
+        """Round-only rank for an arbitrary points total among demo managers."""
+        return 1 + sum(1 for m in self.managers() if m["last_race"] > points)
 
     # -- public leagues ------------------------------------------------------
 
@@ -241,6 +265,12 @@ class GameStore:
             code = _league_code(rng)
             members = rng.sample(managers, k=rng.randint(18, 60))
             members = sorted(members, key=lambda m: m["total"], reverse=True)
+            members = [dict(m) for m in members]
+            for m in members:
+                m["league_rank"] = 0
+            rank_with_ties(members, "total")
+            for m in members:
+                m["league_rank"] = m.pop("rank")
             leagues[code] = {
                 "code": code,
                 "name": name,
@@ -249,9 +279,7 @@ class GameStore:
                 "type": "classic",
                 "creator": members[0]["team_name"] if members else "GRIDLOCK",
                 "member_count": len(members),
-                "members": [
-                    {**m, "league_rank": j + 1} for j, m in enumerate(members)
-                ],
+                "members": members,
             }
         return leagues
 
@@ -322,14 +350,19 @@ class GameStore:
         total_laps = race.laps if race else 57
         current_lap = int(total_laps * 0.68)
         compounds = ["S", "M", "H", "I"]
+        race_points = DEFAULT_SCORING_RULES["race_points"]  # type: ignore[index]
         gap = 0.0
         board = []
         for i, d in enumerate(order):
             c = s.constructors[d.constructor_id]
             if i > 0:
                 gap += rng.uniform(0.6, 3.2)
+            position = i + 1
+            # Live fantasy projection: "if it finished now" — current-position
+            # race points, from the same scoring config the final ledger uses.
+            fantasy = int(race_points.get(position, 0))
             board.append({
-                "position": i + 1,
+                "position": position,
                 "driver_id": d.id,
                 "short": d.short,
                 "name": d.name,
@@ -340,6 +373,7 @@ class GameStore:
                 "tyre": rng.choice(compounds),
                 "pits": rng.randint(1, 2),
                 "delta": rng.randint(-4, 5),
+                "fantasy": fantasy,
             })
 
         # Live fantasy event feed.

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Radio } from 'lucide-react'
 import { Countdown, CountUp } from '../../components/motion'
 import { Skeleton } from '../../components/bits'
-import { StatusCard, trackStatusCard } from '../../components/StatusCard'
+import { StatusCard, StartingGridCard, trackStatusCard } from '../../components/StatusCard'
 import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { useMeta } from '../../lib/meta'
@@ -84,15 +84,24 @@ export default function Live() {
           <span className="eyebrow">Updated {updated === 0 ? 'now' : `${updated * 3}s ago`.replace('0s', 'now')} · <span style={{ color: 'var(--gain)' }}>● connected</span></span>
         </div>
 
-        {/* Broadcast status cards */}
-        <div className="grid g4" style={{ marginBottom: 16 }}>
-          {trackStatusCard(snap.track_status)}
-          <StatusCard variant="purple" time={`1:2${(lap % 6) + 2}.${300 + (lap * 7) % 699}`}
-            driver={(events.find((e) => e.label === 'Fastest lap')?.short) || snap.board[0]?.short} />
-          {snap.board.length > 1 && (
-            <StatusCard variant="battle" title="the lead" a={snap.board[0].short} b={snap.board[1].short} delta={snap.board[1].gap} />
-          )}
-          <StatusCard variant="dotd" driver={snap.board[0]?.name?.split(' ').slice(-1)[0]?.toUpperCase()} />
+        {/* Race-control cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }} className="live-grid">
+          <StartingGridCard
+            title="Race Order"
+            rows={snap.board.slice(0, 5).map((r) => ({ position: r.position, short: r.short, name: r.name, constructor: r.constructor, color: r.color }))}
+            deadline={<span>Lap {lap}/{snap.total_laps}</span>}
+          />
+          <div className="grid g2" style={{ alignContent: 'start' }}>
+            {trackStatusCard(snap.track_status)}
+            <StatusCard variant="purple" time={`1:2${(lap % 6) + 2}.${300 + (lap * 7) % 699}`}
+              driver={(events.find((e) => e.label === 'Fastest lap')?.short) || snap.board[0]?.short} />
+          </div>
+          <div className="grid g2" style={{ alignContent: 'start' }}>
+            {snap.board.length > 1 && (
+              <StatusCard variant="battle" title="the lead" a={snap.board[0].short} b={snap.board[1].short} delta={snap.board[1].gap} />
+            )}
+            <StatusCard variant="dotd" driver={snap.board[0]?.name?.split(' ').slice(-1)[0]?.toUpperCase()} />
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }} className="live-grid">
@@ -100,7 +109,7 @@ export default function Live() {
           <div className="panel" style={{ overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table className="tower">
-                <thead><tr><th>P</th><th>Driver</th><th className="r">Gap</th><th className="r">Tyre</th><th className="r hide-mobile">Pit</th></tr></thead>
+                <thead><tr><th>P</th><th>Driver</th><th className="r">Gap</th><th className="r">Tyre</th><th className="r hide-mobile">Pit</th><th className="r">Fantasy</th></tr></thead>
                 <tbody>
                   {snap.board.map((row) => {
                     const mine = myDrivers.has(row.driver_id)
@@ -112,6 +121,7 @@ export default function Live() {
                         <td className="r num text-dim">{row.gap}</td>
                         <td className="r"><span className="num" style={{ color: t.c, fontWeight: 700 }}>{t.l}</span></td>
                         <td className="r hide-mobile num text-faint">{row.pits}</td>
+                        <td className="r num" style={{ fontWeight: 700, color: row.fantasy > 0 ? 'var(--gain)' : 'var(--text-faint)' }}>{row.fantasy > 0 ? `+${row.fantasy}` : '—'}</td>
                       </tr>
                     )
                   })}

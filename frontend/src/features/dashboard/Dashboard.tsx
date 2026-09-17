@@ -11,7 +11,7 @@ import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { useMeta } from '../../lib/meta'
 import { flagEmoji, money } from '../../lib/format'
-import type { Driver, Constructor, Insight, MeResponse } from '../../lib/types'
+import type { Driver, Constructor, Insight, LeagueSummary, MeResponse } from '../../lib/types'
 
 export default function Dashboard() {
   const { authed, profile } = useSession()
@@ -20,9 +20,13 @@ export default function Dashboard() {
   const [drivers, setDrivers] = useState<Map<number, Driver>>(new Map())
   const [constructors, setConstructors] = useState<Map<number, Constructor>>(new Map())
   const [insights, setInsights] = useState<Insight[]>([])
+  const [myLeagues, setMyLeagues] = useState<LeagueSummary[]>([])
 
   useEffect(() => {
-    if (authed) api.me().then(setMe).catch(() => {})
+    if (authed) {
+      api.me().then(setMe).catch(() => {})
+      api.leagues().then((r) => setMyLeagues(r.mine)).catch(() => {})
+    }
     api.drivers().then((r) => setDrivers(new Map(r.drivers.map((d) => [d.id, d])))).catch(() => {})
     api.constructors().then((r) => setConstructors(new Map(r.constructors.map((c) => [c.id, c])))).catch(() => {})
     api.insights().then((r) => setInsights(r.insights)).catch(() => {})
@@ -36,25 +40,25 @@ export default function Dashboard() {
     { label: 'Team complete', done: (team?.driver_ids.length ?? 0) === (meta?.config.roster.drivers ?? 5) && (team?.constructor_ids.length ?? 0) === (meta?.config.roster.constructors ?? 2) },
     { label: 'Captain selected', done: !!team?.captain_id },
     { label: 'Boost armed', done: !!team?.active_boost },
-    { label: 'Transfers available', done: false },
+    { label: 'Transfers available', done: (team?.free_transfers ?? 0) > 0 },
   ]
 
   return (
     <div className="page">
       <div className="container">
-        {/* Hero — broadcast-style, over live motion */}
-        <motion.section className="hero-v2" style={{ minHeight: 320, marginBottom: 20, display: 'flex' }}
+        {/* Hero — cinematic, rounded, floating overview card (reference composition) */}
+        <motion.section className="hero-frame" style={{ marginBottom: 20 }}
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="hero-v2__media"><SpeedBackground intensity={1.15} /></div>
-          <div className="hero-v2__scrim" />
-          <div className="hero-v2__content" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 'clamp(22px,3.5vw,44px)' }}>
+          <div className="hero-frame__media"><SpeedBackground intensity={1.15} /></div>
+          <div className="hero-frame__scrim" />
+          <div className="hero-frame__content">
             <div className="row between wrap gap-2">
               <span className="eyebrow" style={{ color: 'var(--text-dim)' }}>Next Race · Round {nr?.round}</span>
               <span className="live-pill"><span className="dot" /> Race Week</span>
             </div>
             <div style={{ marginTop: 'auto' }}>
               <span className="text-dim" style={{ fontSize: 15 }}>{flagEmoji(nr?.country)} {nr?.location}{nr ? `, ${nr.country_name}` : ''}</span>
-              <h1 className="display" style={{ fontSize: 'clamp(38px,7vw,84px)', margin: '4px 0 2px' }}>
+              <h1 className="hero-frame__title" style={{ margin: '4px 0 2px' }}>
                 {nr ? nr.name : <Skeleton w={320} h={60} />}
               </h1>
               <div className="row between wrap gap-3" style={{ marginTop: 20 }}>
@@ -74,6 +78,30 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Floating overview card — track map + conditions, per the reference composition */}
+          <div className="hero-overlay">
+            <div className="row between" style={{ marginBottom: 4 }}>
+              <span className="eyebrow">Overview</span>
+              <span className="eyebrow">{nr?.is_sprint ? 'Sprint' : 'Grand Prix'}</span>
+            </div>
+            {nr && <div style={{ margin: '6px -4px 4px' }}><CircuitTrace seed={nr.slug} height={110} /></div>}
+            <div className="eyebrow" style={{ marginBottom: 2 }}>Track name</div>
+            <div className="section-title" style={{ fontSize: 16, marginBottom: 10 }}>{nr?.circuit ?? '—'}</div>
+            <div className="row between">
+              <div><div className="eyebrow">Length</div><div className="num" style={{ fontWeight: 700, marginTop: 2 }}>{nr ? `${nr.length_km} km` : '—'}</div></div>
+              <div><div className="eyebrow">Weather</div><div className="num" style={{ fontWeight: 700, marginTop: 2 }}>{nr?.weather ?? '—'}</div></div>
+            </div>
+            {leader && (
+              <div className="row gap-2" style={{ marginTop: 14, padding: 10, borderRadius: 14, background: `linear-gradient(120deg, ${leader.constructor.color} -10%, #7a0400 120%)` }}>
+                <Avatar name={leader.name} number={leader.number} color={leader.constructor.color} size={36} />
+                <div>
+                  <div className="eyebrow" style={{ color: 'rgba(255,255,255,.8)' }}>Championship leader</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{leader.name}</div>
+                </div>
+              </div>
+            )}
           </div>
         </motion.section>
 
@@ -137,22 +165,8 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Overview: circuit map + championship leader + checklist */}
+          {/* Championship leader + checklist */}
           <div className="col gap-3">
-            <div className="panel panel-pad">
-              <div className="row between" style={{ marginBottom: 4 }}>
-                <span className="eyebrow">Track Overview</span>
-                <span className="eyebrow">{nr?.is_sprint ? 'Sprint' : 'Grand Prix'}</span>
-              </div>
-              <span className="section-title" style={{ fontSize: 16 }}>{nr?.circuit ?? '—'}</span>
-              {nr && <div style={{ margin: '8px -6px 0' }}><CircuitTrace seed={nr.slug} height={150} /></div>}
-              <div className="row between" style={{ marginTop: 8 }}>
-                {[['Length', nr ? `${nr.length_km} km` : '—'], ['Laps', nr?.laps ?? '—'], ['Weather', nr?.weather ?? '—']].map(([k, v]) => (
-                  <div key={k as string}><div className="eyebrow">{k}</div><div className="num" style={{ fontWeight: 700, marginTop: 2 }}>{v}</div></div>
-                ))}
-              </div>
-            </div>
-
             {leader && (
               <div className="panel" style={{ overflow: 'hidden', border: '1px solid transparent' }}>
                 <div className="row between" style={{ padding: 18, background: `linear-gradient(120deg, ${leader.constructor.color} -10%, #7a0400 120%)`, color: '#fff' }}>
@@ -182,6 +196,34 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Leagues */}
+        {authed && (
+          <div style={{ marginTop: 20 }}>
+            <div className="row between" style={{ marginBottom: 12 }}>
+              <span className="section-title" style={{ fontSize: 16 }}>Leagues</span>
+              <Link to="/leagues" className="eyebrow" style={{ color: 'var(--info)' }}>All leagues →</Link>
+            </div>
+            {myLeagues.length ? (
+              <div className="grid g3">
+                {myLeagues.slice(0, 3).map((lg) => (
+                  <Link key={lg.code} to={`/leagues/${lg.code}`} className="panel panel-pad" style={{ display: 'block' }}>
+                    <div className="row between" style={{ marginBottom: 6 }}>
+                      <span className="chip" style={{ padding: '3px 8px' }}>{lg.type}</span>
+                      <span className="eyebrow">{lg.member_count} members</span>
+                    </div>
+                    <div className="section-title" style={{ fontSize: 16 }}>{lg.name}</div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="panel panel-pad row between wrap gap-2">
+                <span className="text-dim">You haven't joined a league yet.</span>
+                <Link to="/leagues" className="btn btn-primary btn-sm">Find a league</Link>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Auditable weekend ledger */}
         {me?.weekend && me.weekend.assets.length > 0 && (

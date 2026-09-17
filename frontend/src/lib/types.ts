@@ -117,6 +117,7 @@ export interface Insight { type: string; text: string; demo: boolean }
 export interface LiveBoardRow {
   position: number; driver_id: number; short: string; name: string; number: number
   constructor: string; color: string; gap: string; tyre: string; pits: number; delta: number
+  fantasy: number
 }
 export interface LiveEvent { lap: number; short: string; color: string; points: number; label: string }
 export interface LiveSnapshot {

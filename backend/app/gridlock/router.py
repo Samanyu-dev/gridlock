@@ -29,6 +29,7 @@ from .store import (
     STORE,
     TEAM_NAME_SUGGESTIONS,
     new_league_code,
+    rank_with_ties,
     scoring_config,
 )
 
@@ -435,6 +436,36 @@ def leaderboard(
     return {"entries": page, "total": len(managers) + (1 if me_row else 0), "me": me_row}
 
 
+@router.get("/leaderboard/round/{round_id}")
+def round_leaderboard(
+    round_id: int,
+    offset: int = 0,
+    limit: int = Query(default=25, le=100),
+    p: Optional[GLProfile] = Depends(get_optional_user),
+    session: Session = Depends(get_session),
+):
+    """This-round-only ranking (RACE LEADERBOARD). LIVE while the round is in
+    progress, PROVISIONAL once the session ends, FINAL once results are
+    reconciled — mirrors the state on the individual weekend ledger."""
+    page = STORE.round_leaderboard(offset, limit)
+    me_row = None
+    if p:
+        team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
+        if team and team.driver_ids and team.constructor_ids:
+            scored = snapshots.score_team_for_round(
+                team.driver_ids, team.constructor_ids, team.captain_id,
+                team.active_boost, team.boost_driver_id, team.boost_constructor_id, round_id,
+            )
+            me_row = {
+                "rank": STORE.rank_for_round(scored["total"]),
+                "team_name": p.team_name, "manager": f"@{p.username}", "country": p.country,
+                "total": scored["total"], "last_race": scored["total"], "movement": 0, "is_me": True,
+                "state": scored["state"],
+            }
+    total = len(STORE.managers()) + (1 if me_row else 0)
+    return {"round": round_id, "entries": page, "me": me_row, "total": total}
+
+
 # --------------------------------------------------------------------------- #
 # Leagues.
 # --------------------------------------------------------------------------- #
@@ -539,8 +570,9 @@ def league_detail(code: str, p: Optional[GLProfile] = Depends(get_optional_user)
         if my_row:
             members = members + [my_row]
         members.sort(key=lambda m: m["total"], reverse=True)
-        for i, m in enumerate(members):
-            m["league_rank"] = i + 1
+        rank_with_ties(members, "total")
+        for m in members:
+            m["league_rank"] = m.pop("rank")
         return {
             "code": demo["code"], "name": demo["name"], "description": demo["description"],
             "privacy": demo["privacy"], "type": demo["type"], "creator": demo["creator"],
@@ -568,8 +600,9 @@ def league_detail(code: str, p: Optional[GLProfile] = Depends(get_optional_user)
             "is_me": bool(username and prof.username == username),
         })
     members.sort(key=lambda m: m["total"], reverse=True)
-    for i, m in enumerate(members):
-        m["league_rank"] = i + 1
+    rank_with_ties(members, "total")
+    for m in members:
+        m["league_rank"] = m.pop("rank")
     return {
         "code": lg.code, "name": lg.name, "description": lg.description,
         "privacy": lg.privacy, "type": lg.type,

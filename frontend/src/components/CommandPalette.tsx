@@ -42,9 +42,8 @@ export function CommandPalette() {
 
   return (
     <>
-      <button className="btn btn-ghost btn-sm hide-mobile" onClick={() => setOpen(true)} aria-label="Search"
-        style={{ gap: 8, color: 'var(--text-dim)' }}>
-        <Search size={14} /> Search <kbd style={{ fontFamily: 'var(--font-num)', fontSize: 10, border: '1px solid var(--line)', borderRadius: 4, padding: '1px 5px' }}>⌘K</kbd>
+      <button className="shell__search hide-mobile" onClick={() => setOpen(true)} aria-label="Search">
+        <Search size={15} /> Search <kbd style={{ marginLeft: 'auto', fontFamily: 'var(--font-num)', fontSize: 10, border: '1px solid var(--line)', borderRadius: 4, padding: '1px 5px' }}>⌘K</kbd>
       </button>
       <button className="btn btn-ghost btn-sm only-mobile" onClick={() => setOpen(true)} aria-label="Search"><Search size={16} /></button>
       <AnimatePresence>

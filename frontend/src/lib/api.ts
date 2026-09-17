@@ -86,6 +86,8 @@ export const api = {
 
   leaderboard: (p: { offset?: number; limit?: number } = {}) =>
     req<{ entries: LeaderboardRow[]; total: number; me: LeaderboardRow | null }>(`/leaderboard${qs(p)}`),
+  leaderboardRound: (round: number, p: { offset?: number; limit?: number } = {}) =>
+    req<{ round: number; entries: LeaderboardRow[]; me: LeaderboardRow | null; total: number }>(`/leaderboard/round/${round}${qs(p)}`),
 
   leagues: () => req<{ public: LeagueSummary[]; mine: LeagueSummary[] }>('/leagues'),
   createLeague: (p: { name: string; description: string; privacy: string; type: string }) =>
