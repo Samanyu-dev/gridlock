@@ -510,3 +510,38 @@ h1, h2, h3 { margin: 0; }
 
 /* Landing-page mini grid preview — a lighter single-column staggered list. */
 .grid-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); margin-left: var(--row-shift, 0px); transition: margin 0.2s ease; }
+
+/* ========================================================================== *
+ * Team cards — official constructor colors + real driver/car art (matches
+ * formula1.com's own team-card language). Deliberately solid, not glass:
+ * these are brand-color surfaces, not UI chrome.
+ * ========================================================================== */
+.team-card {
+  position: relative; z-index: 0; overflow: hidden; isolation: isolate;
+  border-radius: var(--radius); min-height: 256px; display: flex; flex-direction: column;
+  background: var(--team-color); color: #fff; padding: 20px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--shadow);
+}
+.team-card:hover { transform: translateY(-3px); box-shadow: 0 30px 60px -24px rgba(0,0,0,0.55); }
+.team-card:hover .team-card__name { text-decoration: underline; }
+.team-card__scrim {
+  position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(315deg, rgb(from var(--team-accent) r g b / 0) 0%, rgb(from var(--team-accent) r g b / 1) 100%);
+}
+.team-card__top { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.team-card__name { font-family: var(--font-display); font-weight: 900; font-size: 26px; letter-spacing: -0.01em; line-height: 1.05; }
+.team-card__driver-pic { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: rgba(0,0,0,0.25); flex: none; }
+.team-card__driver-pic img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.team-card__driver-name { font-size: 11px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.95; }
+.team-card__logo { width: 44px; height: 44px; border-radius: 12px; background: var(--team-accent); display: grid; place-items: center; flex: none; }
+.team-card__logo img { width: 26px; height: 26px; object-fit: contain; }
+.team-card__car {
+  position: absolute; right: -6px; bottom: -4px; height: 128px; width: auto; max-width: 78%;
+  z-index: 1; object-fit: contain; object-position: bottom right; pointer-events: none;
+  filter: drop-shadow(0 18px 26px rgba(0,0,0,0.4));
+}
+@media (max-width: 560px) {
+  .team-card__car { height: 96px; }
+  .team-card__name { font-size: 22px; }
+}

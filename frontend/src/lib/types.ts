@@ -1,8 +1,8 @@
-export interface ConstructorRef { id: number; name: string; short: string; color: string; slug: string }
+export interface ConstructorRef { id: number; name: string; short: string; color: string; accessible_color: string; slug: string }
 
 export interface Driver {
   id: number; name: string; short: string; number: number; slug: string
-  country: string; country_name: string
+  country: string; country_name: string; image_url: string
   constructor: ConstructorRef
   price: number; price_prev: number; price_delta: number
   points: number; form: number; ownership: number; status: string
@@ -29,10 +29,11 @@ export interface DriverFull extends Driver {
 
 export interface Constructor {
   id: number; name: string; short: string; slug: string; color: string
+  accessible_color: string; logo_url: string; car_url: string
   price: number; price_prev: number; price_delta: number
   points: number; form: number; ownership: number; reliability: number
   last5: number[]; value: number
-  drivers: { id: number; name: string; short: string; number: number }[]
+  drivers: { id: number; name: string; short: string; number: number; image_url: string }[]
 }
 export interface ConstructorFull extends Constructor {
   history: { round: number; points: number }[]
@@ -116,7 +117,7 @@ export interface Insight { type: string; text: string; demo: boolean }
 
 export interface LiveBoardRow {
   position: number; driver_id: number; short: string; name: string; number: number
-  constructor: string; color: string; gap: string; tyre: string; pits: number; delta: number
+  constructor: string; color: string; image_url: string; gap: string; tyre: string; pits: number; delta: number
   fantasy: number
 }
 export interface LiveEvent { lap: number; short: string; color: string; points: number; label: string }

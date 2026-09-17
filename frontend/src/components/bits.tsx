@@ -1,10 +1,22 @@
+import { useState } from 'react'
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { initials } from '../lib/format'
 
-/** Generated driver monogram — team-colored, with car number. */
-export function Avatar({ name, number, color, size = 44 }: {
-  name: string; number?: number; color: string; size?: number
+/** Driver headshot when `image` is given (falls back to a team-colored
+ *  monogram with car number if there's no image, or it fails to load). */
+export function Avatar({ name, number, color, size = 44, image }: {
+  name: string; number?: number; color: string; size?: number; image?: string
 }) {
+  const [broken, setBroken] = useState(false)
+  if (image && !broken) {
+    return (
+      <span className="avatar" style={{ width: size, height: size, background: shade(color, -55) }}>
+        <img src={image} alt={name} onError={() => setBroken(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} />
+        {number !== undefined && <span className="num">{number}</span>}
+      </span>
+    )
+  }
   return (
     <span className="avatar" style={{
       width: size, height: size, fontSize: size * 0.36,

@@ -36,7 +36,7 @@ export default function ConstructorProfile() {
         <div className="grid g2" style={{ marginBottom: 20 }}>
           {c.drivers_full.map((d) => (
             <Link key={d.id} to={`/drivers/${d.slug}`} className="panel panel-pad row between">
-              <span className="row gap-2"><Avatar name={d.name} number={d.number} color={c.color} size={44} /><div className="col"><span style={{ fontWeight: 600 }}>{d.name}</span><span className="eyebrow">{money(d.price)} · form {d.form}</span></div></span>
+              <span className="row gap-2"><Avatar name={d.name} number={d.number} color={c.color} size={44} image={d.image_url} /><div className="col"><span style={{ fontWeight: 600 }}>{d.name}</span><span className="eyebrow">{money(d.price)} · form {d.form}</span></div></span>
               <span className="num" style={{ fontWeight: 800, fontSize: 20 }}>{d.points}</span>
             </Link>
           ))}

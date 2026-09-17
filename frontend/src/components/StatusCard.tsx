@@ -38,10 +38,10 @@ function Card({ variant, children, tall }: { variant: Variant; children: ReactNo
 export function StatusCard(props: {
   variant: Variant
   title?: string; subtitle?: string
-  time?: string; driver?: string
+  time?: string; driver?: string; driverImage?: string
   a?: string; b?: string; delta?: string
 }) {
-  const { variant, title, subtitle, time, driver, a, b, delta } = props
+  const { variant, title, subtitle, time, driver, driverImage, a, b, delta } = props
   const m = META[variant]
   const Icon = m.icon
   const solid = variant === 'green' || variant === 'yellow' || variant === 'red' || variant === 'purple'
@@ -83,7 +83,7 @@ export function StatusCard(props: {
             <div className="rc-card__title" style={{ fontSize: 16, lineHeight: 1.05 }}>Driver of<br />the Day</div>
             <span className="rc-card__title" style={{ fontSize: 18, marginTop: 8, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{driver}</span>
           </div>
-          <Avatar name={driver || '??'} color="var(--caution)" size={40} />
+          <Avatar name={driver || '??'} color="var(--caution)" size={40} image={driverImage} />
         </div>
       </Card>
     )
@@ -113,7 +113,7 @@ export function trackStatusCard(status: string) {
 
 /** Tall "Starting Grid" / running-order card + a Watch Live affordance. */
 export function StartingGridCard({ rows, deadline, title = 'Starting Grid' }: {
-  rows: { position: number; short: string; name: string; constructor: string; color: string }[]
+  rows: { position: number; short: string; name: string; constructor: string; color: string; image_url?: string }[]
   deadline?: ReactNode
   title?: string
 }) {
@@ -130,7 +130,7 @@ export function StartingGridCard({ rows, deadline, title = 'Starting Grid' }: {
       <div className="rc-card__list">
         {rows.slice(0, 5).map((r) => (
           <div key={r.position} className="rc-card__row">
-            <Avatar name={r.name} color={r.color} size={34} />
+            <Avatar name={r.name} color={r.color} size={34} image={r.image_url} />
             <b className="num">{r.position}.</b>
             <strong style={{ flex: 1 }}>{r.name}</strong>
             <span className="text-faint" style={{ fontSize: 13 }}>{r.constructor}</span>

@@ -367,6 +367,7 @@ class GameStore:
                 "number": d.number,
                 "constructor": c.name,
                 "color": c.color,
+                "image_url": d.image_url,
                 "gap": "LEADER" if i == 0 else f"+{gap:.3f}",
                 "tyre": rng.choice(compounds),
                 "pits": rng.randint(1, 2),

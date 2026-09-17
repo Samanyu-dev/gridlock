@@ -95,7 +95,7 @@ export default function Dashboard() {
             </div>
             {leader && (
               <div className="row gap-2" style={{ marginTop: 14, padding: 10, borderRadius: 14, background: `linear-gradient(120deg, ${leader.constructor.color} -10%, #7a0400 120%)` }}>
-                <Avatar name={leader.name} number={leader.number} color={leader.constructor.color} size={36} />
+                <Avatar name={leader.name} number={leader.number} color={leader.constructor.color} size={36} image={leader.image_url} />
                 <div>
                   <div className="eyebrow" style={{ color: 'rgba(255,255,255,.8)' }}>Championship leader</div>
                   <div style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{leader.name}</div>
@@ -140,7 +140,7 @@ export default function Dashboard() {
                     return (
                       <div key={id} className="col center panel" style={{ padding: 10, gap: 6, textAlign: 'center', position: 'relative', borderColor: d.constructor.color + '55' }}>
                         {team!.captain_id === id && <span style={{ position: 'absolute', top: 5, left: 5, background: 'var(--red)', color: '#fff', width: 20, height: 20, borderRadius: 5, fontWeight: 800, fontSize: 11, display: 'grid', placeItems: 'center' }}>C</span>}
-                        <Avatar name={d.name} number={d.number} color={d.constructor.color} size={40} />
+                        <Avatar name={d.name} number={d.number} color={d.constructor.color} size={40} image={d.image_url} />
                         <div style={{ fontSize: 12, fontWeight: 600 }}>{d.short}</div>
                         <div className="eyebrow">{d.last5[d.last5.length - 1] ?? 0} pts</div>
                       </div>
@@ -176,7 +176,7 @@ export default function Dashboard() {
                     <span style={{ fontSize: 13, opacity: 0.85 }}>{leader.constructor.name} · {leader.points} pts</span>
                   </div>
                   <div className="col center">
-                    <Avatar name={leader.name} number={leader.number} color={leader.constructor.color} size={52} />
+                    <Avatar name={leader.name} number={leader.number} color={leader.constructor.color} size={52} image={leader.image_url} />
                     <span className="display" style={{ fontSize: 30, marginTop: 6 }}>{String(leader.number).padStart(2, '0')}</span>
                   </div>
                 </div>

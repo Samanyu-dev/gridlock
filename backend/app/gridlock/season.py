@@ -37,47 +37,71 @@ COMPLETED_ROUNDS = 14  # rounds 1..14 finished; round 15 is the next race.
 # Static identities — the real 2026 F1 grid (fantasy play only).
 # --------------------------------------------------------------------------- #
 
-# (name, base_pace 0-1, reliability 0-1, hex color, short code)
+# (name, base_pace 0-1, reliability 0-1, hex color, accessible/dark shade,
+#  short code, media folder) — colors + media folder match formula1.com.
 CONSTRUCTOR_DEFS = [
-    ("McLaren", 0.95, 0.92, "#FF8000", "MCL"),
-    ("Ferrari", 0.93, 0.93, "#E8002D", "FER"),
-    ("Red Bull Racing", 0.91, 0.90, "#3671C6", "RBR"),
-    ("Mercedes", 0.89, 0.91, "#00D2BE", "MER"),
-    ("Aston Martin", 0.83, 0.87, "#229971", "AMR"),
-    ("Williams", 0.79, 0.86, "#64C4FF", "WIL"),
-    ("Alpine", 0.71, 0.81, "#0093CC", "ALP"),
-    ("Racing Bulls", 0.66, 0.85, "#6692FF", "RB"),
-    ("Haas", 0.64, 0.80, "#B6BABD", "HAA"),
-    ("Audi", 0.60, 0.77, "#BB0A30", "AUD"),
-    ("Cadillac", 0.52, 0.75, "#C9A64A", "CAD"),
+    ("McLaren", 0.95, 0.92, "#FF8000", "#804000", "MCL", "mclaren"),
+    ("Ferrari", 0.93, 0.93, "#E8002D", "#5C0012", "FER", "ferrari"),
+    ("Red Bull Racing", 0.91, 0.90, "#3671C6", "#142948", "RBR", "redbullracing"),
+    ("Mercedes", 0.89, 0.91, "#27F4D2", "#067E6A", "MER", "mercedes"),
+    ("Aston Martin", 0.83, 0.87, "#229971", "#0F4331", "AMR", "astonmartin"),
+    ("Williams", 0.79, 0.86, "#1868DB", "#082145", "WIL", "williams"),
+    ("Alpine", 0.71, 0.81, "#00A1E8", "#004E70", "ALP", "alpine"),
+    ("Racing Bulls", 0.66, 0.85, "#6692FF", "#0038C2", "RB", "racingbulls"),
+    ("Haas F1 Team", 0.64, 0.80, "#DEE1E2", "#667175", "HAA", "haasf1team"),
+    ("Audi", 0.60, 0.77, "#FF2D00", "#751500", "AUD", "audi"),
+    ("Cadillac", 0.52, 0.75, "#AAAAAD", "#58585B", "CAD", "cadillac"),
 ]
 
-# (name, short, number, country ISO2, skill 0-100, constructor index)
-# Confirmed 2026 F1 grid — 11 teams, 22 seats.
+# (name, short, number, country ISO2, skill 0-100, constructor index, media code)
+# Confirmed 2026 F1 grid — 11 teams, 22 seats. Names + media codes match formula1.com.
 DRIVER_DEFS = [
-    ("Lando Norris", "NOR", 1, "GB", 95, 0),
-    ("Oscar Piastri", "PIA", 81, "AU", 92, 0),
-    ("Charles Leclerc", "LEC", 16, "MC", 94, 1),
-    ("Lewis Hamilton", "HAM", 44, "GB", 92, 1),
-    ("Max Verstappen", "VER", 3, "NL", 96, 2),
-    ("Isack Hadjar", "HAD", 6, "FR", 84, 2),
-    ("George Russell", "RUS", 63, "GB", 90, 3),
-    ("Andrea Kimi Antonelli", "ANT", 12, "IT", 85, 3),
-    ("Fernando Alonso", "ALO", 14, "ES", 89, 4),
-    ("Lance Stroll", "STR", 18, "CA", 77, 4),
-    ("Carlos Sainz", "SAI", 55, "ES", 87, 5),
-    ("Alex Albon", "ALB", 23, "TH", 85, 5),
-    ("Pierre Gasly", "GAS", 10, "FR", 81, 6),
-    ("Franco Colapinto", "COL", 43, "AR", 76, 6),
-    ("Liam Lawson", "LAW", 30, "NZ", 79, 7),
-    ("Arvid Lindblad", "LIN", 41, "GB", 74, 7),
-    ("Esteban Ocon", "OCO", 31, "FR", 80, 8),
-    ("Oliver Bearman", "BEA", 87, "GB", 79, 8),
-    ("Nico Hülkenberg", "HUL", 27, "DE", 78, 9),
-    ("Gabriel Bortoleto", "BOR", 5, "BR", 77, 9),
-    ("Sergio Pérez", "PER", 11, "MX", 83, 10),
-    ("Valtteri Bottas", "BOT", 77, "FI", 80, 10),
+    ("Lando Norris", "NOR", 1, "GB", 95, 0, "lannor01"),
+    ("Oscar Piastri", "PIA", 81, "AU", 92, 0, "oscpia01"),
+    ("Charles Leclerc", "LEC", 16, "MC", 94, 1, "chalec01"),
+    ("Lewis Hamilton", "HAM", 44, "GB", 92, 1, "lewham01"),
+    ("Max Verstappen", "VER", 3, "NL", 96, 2, "maxver01"),
+    ("Isack Hadjar", "HAD", 6, "FR", 84, 2, "isahad01"),
+    ("George Russell", "RUS", 63, "GB", 90, 3, "georus01"),
+    ("Kimi Antonelli", "ANT", 12, "IT", 85, 3, "andant01"),
+    ("Fernando Alonso", "ALO", 14, "ES", 89, 4, "feralo01"),
+    ("Lance Stroll", "STR", 18, "CA", 77, 4, "lanstr01"),
+    ("Carlos Sainz", "SAI", 55, "ES", 87, 5, "carsai01"),
+    ("Alexander Albon", "ALB", 23, "TH", 85, 5, "alealb01"),
+    ("Pierre Gasly", "GAS", 10, "FR", 81, 6, "piegas01"),
+    ("Franco Colapinto", "COL", 43, "AR", 76, 6, "fracol01"),
+    ("Liam Lawson", "LAW", 30, "NZ", 79, 7, "lialaw01"),
+    ("Arvid Lindblad", "LIN", 41, "GB", 74, 7, "arvlin01"),
+    ("Esteban Ocon", "OCO", 31, "FR", 80, 8, "estoco01"),
+    ("Oliver Bearman", "BEA", 87, "GB", 79, 8, "olibea01"),
+    ("Nico Hulkenberg", "HUL", 27, "DE", 78, 9, "nichul01"),
+    ("Gabriel Bortoleto", "BOR", 5, "BR", 77, 9, "gabbor01"),
+    ("Sergio Perez", "PER", 11, "MX", 83, 10, "serper01"),
+    ("Valtteri Bottas", "BOT", 77, "FI", 80, 10, "valbot01"),
 ]
+
+# formula1.com media CDN — real driver/car/logo art (2026 fallback renders).
+_MEDIA_BASE = "https://media.formula1.com/image/upload"
+
+
+def _driver_image(team_folder: str, code: str) -> str:
+    return (
+        f"{_MEDIA_BASE}/c_lfill,w_200/q_auto/"
+        f"d_common:f1:2026:fallback:driver:2026fallbackdriverright.webp/"
+        f"v1740000001/common/f1/2026/{team_folder}/{code}/2026{team_folder}{code}right.webp"
+    )
+
+
+def _car_image(team_folder: str) -> str:
+    return (
+        f"{_MEDIA_BASE}/c_lfill,h_224/q_auto/"
+        f"d_common:f1:2026:fallback:car:2026fallbackcarright.webp/"
+        f"v1740000001/common/f1/2026/{team_folder}/2026{team_folder}carright.webp"
+    )
+
+
+def _logo_image(team_folder: str) -> str:
+    return f"{_MEDIA_BASE}/c_lfill,w_128/q_auto/v1740000001/common/f1/2026/{team_folder}/2026{team_folder}logowhite.webp"
 
 # (round, name, location, country ISO2, circuit, laps, length_km, sprint?)
 CIRCUIT_DEFS = [
@@ -143,6 +167,9 @@ class Constructor:
     round_points: Dict[int, int] = field(default_factory=dict)
     round_breakdown: Dict[int, list] = field(default_factory=dict)
     ownership: float = 0.0
+    accessible_color: str = ""
+    logo_url: str = ""
+    car_url: str = ""
 
 
 @dataclass
@@ -165,6 +192,7 @@ class Driver:
     round_breakdown: Dict[int, list] = field(default_factory=dict)
     results: Dict[int, dict] = field(default_factory=dict)  # round -> classification
     ownership: float = 0.0
+    image_url: str = ""
 
 
 @dataclass
@@ -412,20 +440,23 @@ def build_season(now: Optional[datetime] = None) -> Season:
     engine = FantasyScoringEngine()
 
     constructors: Dict[int, Constructor] = {}
-    for i, (name, pace, rel, color, short) in enumerate(CONSTRUCTOR_DEFS):
+    for i, (name, pace, rel, color, accessible, short, folder) in enumerate(CONSTRUCTOR_DEFS):
         cid = i + 1
         constructors[cid] = Constructor(
             id=cid, name=name, slug=_slugify(name), short=short,
             color=color, pace=pace, reliability=rel,
+            accessible_color=accessible, logo_url=_logo_image(folder), car_url=_car_image(folder),
         )
 
     drivers: Dict[int, Driver] = {}
-    for i, (name, short, number, country, skill, cidx) in enumerate(DRIVER_DEFS):
+    for i, (name, short, number, country, skill, cidx, code) in enumerate(DRIVER_DEFS):
         did = i + 1
         cid = cidx + 1
+        folder = CONSTRUCTOR_DEFS[cidx][6]
         d = Driver(
             id=did, name=name, short=short, number=number, country=country,
             skill=skill, constructor_id=cid, slug=_slugify(name),
+            image_url=_driver_image(folder, code),
         )
         drivers[did] = d
         constructors[cid].driver_ids.append(did)

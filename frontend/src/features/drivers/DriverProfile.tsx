@@ -23,7 +23,7 @@ export default function DriverProfile() {
         <div className="panel" style={{ overflow: 'hidden', marginBottom: 20 }}>
           <div className="row between wrap gap-3" style={{ padding: 28, background: `linear-gradient(130deg, ${color}2e, transparent 65%)` }}>
             <div className="row gap-3">
-              <Avatar name={d.name} number={d.number} color={color} size={92} />
+              <Avatar name={d.name} number={d.number} color={color} size={92} image={d.image_url} />
               <div>
                 <span className="eyebrow">#{d.number} · {d.constructor.name}</span>
                 <h1 className="display" style={{ fontSize: 'clamp(30px,5vw,52px)', margin: '4px 0' }}>{d.name}</h1>
@@ -76,7 +76,7 @@ export default function DriverProfile() {
               <div className="panel panel-pad">
                 <span className="section-title" style={{ fontSize: 16 }}>Teammate</span>
                 <Link to={`/drivers/${d.teammate.slug}`} className="row between" style={{ marginTop: 12, padding: 10, background: 'var(--surface-2)', borderRadius: 8 }}>
-                  <span className="row gap-2"><Avatar name={d.teammate.name} number={d.teammate.number} color={color} size={34} /><span style={{ fontWeight: 600 }}>{d.teammate.name}</span></span>
+                  <span className="row gap-2"><Avatar name={d.teammate.name} number={d.teammate.number} color={color} size={34} image={d.teammate.image_url} /><span style={{ fontWeight: 600 }}>{d.teammate.name}</span></span>
                   <span className="num" style={{ fontWeight: 700 }}>{d.teammate.points} pts</span>
                 </Link>
               </div>

@@ -146,7 +146,7 @@ export default function TeamBuilder() {
                               style={{ position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 8, border: 'none',
                                 background: captain === d.id ? 'var(--red)' : 'var(--surface-3)', color: '#fff', fontWeight: 800, fontSize: 12, boxShadow: 'var(--neo-raised-sm)' }}>C</button>
                             <button onClick={(e) => { e.stopPropagation(); toggleDriver(d) }} style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', color: 'var(--text-faint)' }}><X size={15} /></button>
-                            <Avatar name={d.name} number={d.number} color={d.constructor.color} size={44} />
+                            <Avatar name={d.name} number={d.number} color={d.constructor.color} size={44} image={d.image_url} />
                             <div style={{ fontWeight: 600, fontSize: 13 }}>{d.short}</div>
                             <div className="eyebrow">{d.constructor.short}</div>
                           </>
@@ -213,7 +213,7 @@ export default function TeamBuilder() {
                     return (
                       <div key={d.id} className="row between race-edge" style={{ ['--accent' as string]: d.constructor.color, padding: '10px 12px 10px 16px', borderBottom: '1px solid var(--line-soft)', opacity: roomLeft ? 1 : 0.45 }}>
                         <button className="row gap-2 grow" style={{ background: 'transparent', border: 'none', color: 'var(--text)', textAlign: 'left' }} onClick={() => setDrawer(d.slug)}>
-                          <Avatar name={d.name} number={d.number} color={d.constructor.color} size={38} />
+                          <Avatar name={d.name} number={d.number} color={d.constructor.color} size={38} image={d.image_url} />
                           <div className="col">
                             <span style={{ fontWeight: 600, fontSize: 14 }}>{d.name} <Info size={11} className="text-faint" /></span>
                             <span className="eyebrow">{d.constructor.short} · {d.ownership}% owned</span>

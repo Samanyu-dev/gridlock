@@ -88,7 +88,7 @@ export default function Live() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }} className="live-grid">
           <StartingGridCard
             title="Race Order"
-            rows={snap.board.slice(0, 5).map((r) => ({ position: r.position, short: r.short, name: r.name, constructor: r.constructor, color: r.color }))}
+            rows={snap.board.slice(0, 5).map((r) => ({ position: r.position, short: r.short, name: r.name, constructor: r.constructor, color: r.color, image_url: r.image_url }))}
             deadline={<span>Lap {lap}/{snap.total_laps}</span>}
           />
           <div className="grid g2" style={{ alignContent: 'start' }}>
@@ -100,7 +100,7 @@ export default function Live() {
             {snap.board.length > 1 && (
               <StatusCard variant="battle" title="the lead" a={snap.board[0].short} b={snap.board[1].short} delta={snap.board[1].gap} />
             )}
-            <StatusCard variant="dotd" driver={snap.board[0]?.name?.split(' ').slice(-1)[0]?.toUpperCase()} />
+            <StatusCard variant="dotd" driver={snap.board[0]?.name?.split(' ').slice(-1)[0]?.toUpperCase()} driverImage={snap.board[0]?.image_url} />
           </div>
         </div>
 

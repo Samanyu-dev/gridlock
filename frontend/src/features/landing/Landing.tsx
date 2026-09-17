@@ -96,7 +96,7 @@ export default function Landing() {
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.08 }}>
                   <div className="row gap-2">
                     <span className="pos" style={{ minWidth: 20 }}>P{i + 1}</span>
-                    <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} />
+                    <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} image={d.image_url} />
                     <div className="col">
                       <span style={{ fontWeight: 600, fontSize: 14 }}>{d.short}</span>
                       <span className="eyebrow">{d.constructor.short}</span>
@@ -170,7 +170,7 @@ export default function Landing() {
               {drivers.slice(0, 5).map((d, i) => (
                 <div key={d.id} className="grid-row" style={{ ['--row-shift' as string]: i % 2 ? '18px' : '0px' }}>
                   <span className="pos" style={{ minWidth: 20 }}>P{i * 2 + 1}</span>
-                  <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} />
+                  <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} image={d.image_url} />
                   <div className="col grow">
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{d.short}</span>
                     <span className="eyebrow">{d.constructor.short}</span>

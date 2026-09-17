@@ -36,7 +36,7 @@ export function DriverDrawer({ slug, selected, onAdd, onClose }: {
                     <button className="btn btn-ghost btn-sm" onClick={onClose}><X size={16} /></button>
                   </div>
                   <div className="row gap-3" style={{ marginTop: 12 }}>
-                    <Avatar name={driver.name} number={driver.number} color={driver.constructor.color} size={72} />
+                    <Avatar name={driver.name} number={driver.number} color={driver.constructor.color} size={72} image={driver.image_url} />
                     <div>
                       <h2 className="display" style={{ fontSize: 28 }}>{driver.name}</h2>
                       <span className="text-dim">{flagEmoji(driver.country)} {driver.country_name}</span>

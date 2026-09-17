@@ -128,7 +128,7 @@ export default function Onboarding() {
                         <button key={d.id} onClick={() => toggleDriver(d.id)}
                           className="panel" style={{ padding: 12, textAlign: 'center', cursor: 'pointer', borderColor: sel ? d.constructor.color : undefined, position: 'relative' }}>
                           {sel && <span style={{ position: 'absolute', top: 6, right: 6, color: 'var(--gain)' }}><Check size={16} /></span>}
-                          <Avatar name={d.name} number={d.number} color={d.constructor.color} size={48} />
+                          <Avatar name={d.name} number={d.number} color={d.constructor.color} size={48} image={d.image_url} />
                           <div style={{ fontWeight: 600, fontSize: 13, marginTop: 8 }}>{d.short}</div>
                           <div className="eyebrow">{flagEmoji(d.country)} {d.constructor.short}</div>
                         </button>

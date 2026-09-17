@@ -42,7 +42,7 @@ export default function Profile() {
                 <span className="text-dim">@{profile.username}{profile.persona ? ` · ${profile.persona}` : ''}</span>
               </div>
             </div>
-            {fav && <div className="col" style={{ alignItems: 'flex-end' }}><span className="eyebrow">Favourite driver</span><span className="row gap-2" style={{ marginTop: 6 }}><Avatar name={fav.name} number={fav.number} color={fav.constructor.color} size={30} />{fav.name}</span></div>}
+            {fav && <div className="col" style={{ alignItems: 'flex-end' }}><span className="eyebrow">Favourite driver</span><span className="row gap-2" style={{ marginTop: 6 }}><Avatar name={fav.name} number={fav.number} color={fav.constructor.color} size={30} image={fav.image_url} />{fav.name}</span></div>}
           </div>
         </div>
 

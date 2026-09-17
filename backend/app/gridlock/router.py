@@ -55,7 +55,11 @@ def _driver_brief(d) -> dict:
     return {
         "id": d.id, "name": d.name, "short": d.short, "number": d.number,
         "slug": d.slug, "country": d.country, "country_name": COUNTRY_NAMES.get(d.country, d.country),
-        "constructor": {"id": c.id, "name": c.name, "short": c.short, "color": c.color, "slug": c.slug},
+        "image_url": d.image_url,
+        "constructor": {
+            "id": c.id, "name": c.name, "short": c.short, "color": c.color,
+            "accessible_color": c.accessible_color, "slug": c.slug,
+        },
         "price": d.price, "price_prev": d.price_prev, "price_delta": round(d.price - d.price_prev, 1),
         "points": d.points, "form": d.form, "ownership": d.ownership, "status": d.status,
         "value": round(d.points / d.price, 1) if d.price else 0, "last5": last5,
@@ -111,12 +115,16 @@ def _constructor_brief(c) -> dict:
     last5 = [c.round_points.get(r, 0) for r in range(max(1, s.next_round - 5), s.next_round)]
     return {
         "id": c.id, "name": c.name, "short": c.short, "slug": c.slug, "color": c.color,
+        "accessible_color": c.accessible_color, "logo_url": c.logo_url, "car_url": c.car_url,
         "price": c.price, "price_prev": c.price_prev, "price_delta": round(c.price - c.price_prev, 1),
         "points": c.points, "form": c.form, "ownership": c.ownership,
         "reliability": round(c.reliability * 100), "last5": last5,
         "value": round(c.points / c.price, 1) if c.price else 0,
         "drivers": [
-            {"id": d, "name": s.drivers[d].name, "short": s.drivers[d].short, "number": s.drivers[d].number}
+            {
+                "id": d, "name": s.drivers[d].name, "short": s.drivers[d].short,
+                "number": s.drivers[d].number, "image_url": s.drivers[d].image_url,
+            }
             for d in c.driver_ids
         ],
     }

@@ -64,7 +64,7 @@ export default function Drivers() {
                     <td><span className={`pos pos-${i + 1}`}>{String(i + 1).padStart(2, '0')}</span></td>
                     <td>
                       <div className="row gap-2">
-                        <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} />
+                        <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} image={d.image_url} />
                         <div className="col"><span style={{ fontWeight: 600 }}>{d.name}</span><span className="eyebrow only-mobile">{d.constructor.short}</span></div>
                       </div>
                     </td>
