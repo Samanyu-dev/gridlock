@@ -1,7 +1,7 @@
-"""Seeded GRIDLOCK demo season.
+"""Seeded GRIDLOCK 2026 season.
 
-All driver / constructor identities are **original** and not affiliated with,
-or endorsed by, any real driver, team, or series. Race results are generated
+Benchmarks the real Formula 1 2026 season — constructors, drivers, circuits —
+referenced for fantasy play only. Race results are generated
 *deterministically* (fixed seeds) so the whole product — points, form, prices,
 ownership, standings, leaderboards — is populated and stable without any
 external API or credentials.
@@ -34,73 +34,77 @@ COMPLETED_ROUNDS = 14  # rounds 1..14 finished; round 15 is the next race.
 
 
 # --------------------------------------------------------------------------- #
-# Static identities (hand-authored for quality; all original).
+# Static identities — the real 2026 F1 grid (fantasy play only).
 # --------------------------------------------------------------------------- #
 
 # (name, base_pace 0-1, reliability 0-1, hex color, short code)
 CONSTRUCTOR_DEFS = [
-    ("Vermillion Racing", 0.95, 0.93, "#E10600", "VMR"),
-    ("Meridian GP", 0.93, 0.95, "#2D6CDF", "MER"),
-    ("Apex Dynamics", 0.88, 0.90, "#FF7A00", "APX"),
-    ("Nova Motorsport", 0.82, 0.88, "#17C3B2", "NOV"),
-    ("Velocity Works", 0.78, 0.85, "#46D160", "VEL"),
-    ("Phantom GP", 0.72, 0.82, "#8B5CF6", "PHM"),
-    ("Solaris Racing", 0.66, 0.80, "#F4C20D", "SOL"),
-    ("Ironclad Racing", 0.60, 0.86, "#B7BFC6", "IRN"),
-    ("Titan Autosport", 0.54, 0.78, "#3E5C86", "TTN"),
-    ("Eclipse Racing", 0.48, 0.74, "#D6409F", "ECL"),
+    ("McLaren", 0.95, 0.92, "#FF8000", "MCL"),
+    ("Ferrari", 0.93, 0.93, "#E8002D", "FER"),
+    ("Red Bull Racing", 0.91, 0.90, "#3671C6", "RBR"),
+    ("Mercedes", 0.89, 0.91, "#00D2BE", "MER"),
+    ("Aston Martin", 0.83, 0.87, "#229971", "AMR"),
+    ("Williams", 0.79, 0.86, "#64C4FF", "WIL"),
+    ("Alpine", 0.71, 0.81, "#0093CC", "ALP"),
+    ("Racing Bulls", 0.66, 0.85, "#6692FF", "RB"),
+    ("Haas", 0.64, 0.80, "#B6BABD", "HAA"),
+    ("Audi", 0.60, 0.77, "#BB0A30", "AUD"),
+    ("Cadillac", 0.52, 0.75, "#C9A64A", "CAD"),
 ]
 
 # (name, short, number, country ISO2, skill 0-100, constructor index)
+# Confirmed 2026 F1 grid — 11 teams, 22 seats.
 DRIVER_DEFS = [
-    ("Marco Vitale", "VIT", 1, "IT", 94, 0),
-    ("Théo Rémy", "REM", 27, "FR", 88, 0),
-    ("Lars Novak", "NOV", 4, "NL", 95, 1),
-    ("Diego Herrera", "HER", 11, "ES", 86, 1),
-    ("Callum Reid", "REI", 3, "GB", 90, 2),
-    ("Kenji Sato", "SAT", 22, "JP", 84, 2),
-    ("Oskar Lind", "LIN", 10, "SE", 85, 3),
-    ("Mateo Rossi", "ROS", 31, "BR", 80, 3),
-    ("Aiden Cross", "CRO", 14, "AU", 83, 4),
-    ("Noah Berg", "BRG", 7, "DE", 79, 4),
-    ("Luca Moretti", "MOR", 23, "IT", 80, 5),
-    ("Finn Walsh", "WAL", 44, "IE", 77, 5),
-    ("Rafael Costa", "COS", 9, "PT", 78, 6),
-    ("Yuki Tanaka", "TAN", 18, "JP", 75, 6),
-    ("Sam Hollis", "HOL", 6, "GB", 74, 7),
-    ("Emil Sørensen", "SOR", 21, "DK", 72, 7),
-    ("Owen Blake", "BLK", 77, "CA", 70, 8),
-    ("André Dumont", "DUM", 5, "FR", 68, 8),
-    ("Hugo Méndez", "MEN", 29, "MX", 66, 9),
-    ("Jack Turner", "TUR", 33, "US", 63, 9),
+    ("Lando Norris", "NOR", 1, "GB", 95, 0),
+    ("Oscar Piastri", "PIA", 81, "AU", 92, 0),
+    ("Charles Leclerc", "LEC", 16, "MC", 94, 1),
+    ("Lewis Hamilton", "HAM", 44, "GB", 92, 1),
+    ("Max Verstappen", "VER", 3, "NL", 96, 2),
+    ("Isack Hadjar", "HAD", 6, "FR", 84, 2),
+    ("George Russell", "RUS", 63, "GB", 90, 3),
+    ("Andrea Kimi Antonelli", "ANT", 12, "IT", 85, 3),
+    ("Fernando Alonso", "ALO", 14, "ES", 89, 4),
+    ("Lance Stroll", "STR", 18, "CA", 77, 4),
+    ("Carlos Sainz", "SAI", 55, "ES", 87, 5),
+    ("Alex Albon", "ALB", 23, "TH", 85, 5),
+    ("Pierre Gasly", "GAS", 10, "FR", 81, 6),
+    ("Franco Colapinto", "COL", 43, "AR", 76, 6),
+    ("Liam Lawson", "LAW", 30, "NZ", 79, 7),
+    ("Arvid Lindblad", "LIN", 41, "GB", 74, 7),
+    ("Esteban Ocon", "OCO", 31, "FR", 80, 8),
+    ("Oliver Bearman", "BEA", 87, "GB", 79, 8),
+    ("Nico Hülkenberg", "HUL", 27, "DE", 78, 9),
+    ("Gabriel Bortoleto", "BOR", 5, "BR", 77, 9),
+    ("Sergio Pérez", "PER", 11, "MX", 83, 10),
+    ("Valtteri Bottas", "BOT", 77, "FI", 80, 10),
 ]
 
 # (round, name, location, country ISO2, circuit, laps, length_km, sprint?)
 CIRCUIT_DEFS = [
-    ("Sunrise Grand Prix", "Melbourne", "AU", "Albert Cove Circuit", 58, 5.28, False),
-    ("Desert Grand Prix", "Jeddah", "SA", "Coastline Speedway", 50, 6.17, True),
-    ("Twilight Grand Prix", "Bahrain", "BH", "Dunes International", 57, 5.41, False),
-    ("Cherry Grand Prix", "Suzuka", "JP", "Figure-Eight Raceway", 53, 5.81, False),
-    ("Monsoon Grand Prix", "Shanghai", "CN", "Golden Dragon Circuit", 56, 5.45, True),
-    ("Skyline Grand Prix", "Miami", "US", "Harbor Loop", 57, 5.41, False),
-    ("Riviera Grand Prix", "Imola", "IT", "Sabbia Autodrome", 63, 4.91, False),
-    ("Harbour Grand Prix", "Monaco", "MC", "Rue Serpentine", 78, 3.34, False),
-    ("Iberia Grand Prix", "Barcelona", "ES", "Catalonia Ring", 66, 4.66, False),
-    ("Maple Grand Prix", "Montréal", "CA", "Île Vitesse", 70, 4.36, True),
-    ("Alpine Grand Prix", "Spielberg", "AT", "Grünberg Ring", 71, 4.32, False),
-    ("Legends Grand Prix", "Silverstone", "GB", "Northgate Circuit", 52, 5.89, False),
-    ("Meadow Grand Prix", "Budapest", "HU", "Hungaro Basin", 70, 4.38, False),
-    ("Forest Grand Prix", "Spa", "BE", "Ardenne Heights", 44, 7.00, True),
-    ("Lowland Grand Prix", "Zandvoort", "NL", "Dune Bowl", 72, 4.26, False),
-    ("Cathedral Grand Prix", "Monza", "IT", "Velocità Park", 53, 5.79, False),
-    ("Lantern Grand Prix", "Singapore", "SG", "Marina Nightway", 62, 4.94, False),
-    ("Frontier Grand Prix", "Austin", "US", "Lone Star Circuit", 56, 5.51, True),
-    ("Sierra Grand Prix", "Mexico City", "MX", "Altitude Autodromo", 71, 4.30, False),
-    ("Carnival Grand Prix", "São Paulo", "BR", "Interlagos Heights", 71, 4.31, True),
-    ("Neon Grand Prix", "Las Vegas", "US", "Boulevard Circuit", 50, 6.20, False),
-    ("Falcon Grand Prix", "Lusail", "QA", "Desert Crown", 57, 5.42, False),
-    ("Marina Grand Prix", "Yas", "AE", "Harbor Island", 58, 5.28, False),
-    ("Finale Grand Prix", "Portimão", "PT", "Algarve Waves", 66, 4.65, False),
+    ("Australian Grand Prix", "Melbourne", "AU", "Albert Park Circuit", 58, 5.28, False),
+    ("Chinese Grand Prix", "Shanghai", "CN", "Shanghai International Circuit", 56, 5.45, True),
+    ("Japanese Grand Prix", "Suzuka", "JP", "Suzuka International Racing Course", 53, 5.81, False),
+    ("Bahrain Grand Prix", "Sakhir", "BH", "Bahrain International Circuit", 57, 5.41, False),
+    ("Saudi Arabian Grand Prix", "Jeddah", "SA", "Jeddah Corniche Circuit", 50, 6.17, False),
+    ("Miami Grand Prix", "Miami", "US", "Miami International Autodrome", 57, 5.41, True),
+    ("Emilia-Romagna Grand Prix", "Imola", "IT", "Autodromo Enzo e Dino Ferrari", 63, 4.91, False),
+    ("Monaco Grand Prix", "Monaco", "MC", "Circuit de Monaco", 78, 3.34, False),
+    ("Spanish Grand Prix", "Barcelona", "ES", "Circuit de Barcelona-Catalunya", 66, 4.66, False),
+    ("Canadian Grand Prix", "Montréal", "CA", "Circuit Gilles Villeneuve", 70, 4.36, False),
+    ("Austrian Grand Prix", "Spielberg", "AT", "Red Bull Ring", 71, 4.32, True),
+    ("British Grand Prix", "Silverstone", "GB", "Silverstone Circuit", 52, 5.89, False),
+    ("Belgian Grand Prix", "Spa", "BE", "Circuit de Spa-Francorchamps", 44, 7.00, True),
+    ("Hungarian Grand Prix", "Budapest", "HU", "Hungaroring", 70, 4.38, False),
+    ("Dutch Grand Prix", "Zandvoort", "NL", "Circuit Zandvoort", 72, 4.26, False),
+    ("Italian Grand Prix", "Monza", "IT", "Autodromo Nazionale Monza", 53, 5.79, False),
+    ("Azerbaijan Grand Prix", "Baku", "AZ", "Baku City Circuit", 51, 6.00, False),
+    ("Singapore Grand Prix", "Marina Bay", "SG", "Marina Bay Street Circuit", 62, 4.94, False),
+    ("United States Grand Prix", "Austin", "US", "Circuit of the Americas", 56, 5.51, True),
+    ("Mexico City Grand Prix", "Mexico City", "MX", "Autódromo Hermanos Rodríguez", 71, 4.30, False),
+    ("São Paulo Grand Prix", "São Paulo", "BR", "Autódromo José Carlos Pace", 71, 4.31, True),
+    ("Las Vegas Grand Prix", "Las Vegas", "US", "Las Vegas Strip Circuit", 50, 6.20, False),
+    ("Qatar Grand Prix", "Lusail", "QA", "Lusail International Circuit", 57, 5.42, False),
+    ("Abu Dhabi Grand Prix", "Abu Dhabi", "AE", "Yas Marina Circuit", 58, 5.28, False),
 ]
 
 COUNTRY_NAMES = {
@@ -109,8 +113,8 @@ COUNTRY_NAMES = {
     "ES": "Spain", "CA": "Canada", "AT": "Austria", "GB": "United Kingdom",
     "HU": "Hungary", "BE": "Belgium", "NL": "Netherlands", "SG": "Singapore",
     "MX": "Mexico", "BR": "Brazil", "QA": "Qatar", "AE": "United Arab Emirates",
-    "PT": "Portugal", "FR": "France", "SE": "Sweden", "DE": "Germany",
-    "IE": "Ireland", "DK": "Denmark",
+    "AZ": "Azerbaijan", "NZ": "New Zealand", "TH": "Thailand", "AR": "Argentina",
+    "FI": "Finland", "FR": "France", "DE": "Germany",
 }
 
 WEATHER = ["Dry · Warm", "Dry · Hot", "Overcast", "Light Rain", "Wet"]

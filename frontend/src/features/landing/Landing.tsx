@@ -71,7 +71,7 @@ export default function Landing() {
                 Build your grid.<br /><span style={{ color: 'var(--red)' }}>Own the weekend.</span>
               </h1>
               <p className="text-dim" style={{ fontSize: 18, maxWidth: 480, lineHeight: 1.5, marginBottom: 28 }}>
-                Draft five drivers and two constructors under a strict budget. Score every practice,
+                Draft ten drivers and two constructors — no budget, just picks. Score every practice,
                 qualifying and race. Make the transfers, call the boosts, and climb from the paddock
                 to the top of the global grid.
               </p>
@@ -144,16 +144,15 @@ export default function Landing() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
           <div>
             <span className="eyebrow">The team builder</span>
-            <h2 className="display" style={{ fontSize: 'clamp(28px,4vw,44px)', margin: '10px 0 16px' }}>Every tenth of budget counts.</h2>
+            <h2 className="display" style={{ fontSize: 'clamp(28px,4vw,44px)', margin: '10px 0 16px' }}>No budget. Just your top 10.</h2>
             <p className="text-dim" style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 20 }}>
-              A <strong>{meta ? money(meta.config.budget) : '$100.0M'}</strong> budget. Five drivers, two constructors,
-              one captain on double points. Spend it on the front row or find value deep in the midfield —
-              the grid is yours to build.
+              Ten drivers, two constructors, one captain on double points — laid out like a real
+              starting grid. Pick who you actually think will deliver, front row to back of the pack.
             </p>
             <div className="col gap-2">
               {[
-                ['Select drivers', 'Portrait, price, form and ownership at a glance.'],
-                ['Pick a constructor', 'Reliability and pit-crew pace matter.'],
+                ['Fill the grid', 'Ten driver slots, paired up like a real starting grid.'],
+                ['Pick two constructors', 'Reliability and pit-crew pace matter.'],
                 ['Name your captain', 'Double points on the driver you trust.'],
               ].map(([t, d]) => (
                 <div key={t} className="row gap-2 race-edge" style={{ padding: '8px 0 8px 16px' }}>
@@ -163,18 +162,18 @@ export default function Landing() {
             </div>
           </div>
           <div className="panel panel-pad">
-            <div className="row between" style={{ marginBottom: 12 }}>
-              <span className="eyebrow">Budget</span>
-              <span className="num" style={{ fontWeight: 700 }}>{money(73.4)} <span className="text-faint">/ {meta ? money(meta.config.budget) : '$100.0M'}</span></span>
+            <div className="row between" style={{ marginBottom: 14 }}>
+              <span className="eyebrow">Your grid</span>
+              <span className="eyebrow">{Math.min(drivers.length, 10)}/10</span>
             </div>
-            <div className="bar" style={{ marginBottom: 18 }}><span style={{ width: '73%' }} /></div>
-            <div className="grid g2">
-              {drivers.slice(0, 4).map((d) => (
-                <div key={d.id} className="row gap-2" style={{ padding: 10, background: 'var(--surface-2)', borderRadius: 8 }}>
-                  <Avatar name={d.name} number={d.number} color={d.constructor.color} size={38} />
+            <div className="col gap-1">
+              {drivers.slice(0, 5).map((d, i) => (
+                <div key={d.id} className="grid-row" style={{ ['--row-shift' as string]: i % 2 ? '18px' : '0px' }}>
+                  <span className="pos" style={{ minWidth: 20 }}>P{i * 2 + 1}</span>
+                  <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} />
                   <div className="col grow">
                     <span style={{ fontWeight: 600, fontSize: 13 }}>{d.short}</span>
-                    <span className="eyebrow">{money(d.price)}</span>
+                    <span className="eyebrow">{d.constructor.short}</span>
                   </div>
                 </div>
               ))}
@@ -244,7 +243,7 @@ export default function Landing() {
       <footer style={{ borderTop: '1px solid var(--line)' }}>
         <div className="container row between wrap gap-2" style={{ padding: '24px 20px', color: 'var(--text-faint)', fontSize: 13 }}>
           <Brand size={15} />
-          <span>All drivers, constructors and results are original & fictional. Not affiliated with any real series. Free-to-play — no real-money wagering.</span>
+          <span>Unofficial fan project for a private group. Driver, team and race data via OpenF1 — not affiliated with Formula 1. Free-to-play — no real-money wagering.</span>
         </div>
       </footer>
     </div>

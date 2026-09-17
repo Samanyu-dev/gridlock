@@ -1,5 +1,5 @@
 import { Flag, Car, Ban, Timer, Swords, Trophy, Play } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Brand } from './Brand'
 import { Avatar } from './bits'
 
@@ -47,13 +47,14 @@ export function StatusCard(props: {
   const solid = variant === 'green' || variant === 'yellow' || variant === 'red' || variant === 'purple'
 
   if (variant === 'battle') {
+    const clip: CSSProperties = { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
     return (
       <Card variant={variant}>
         <span className="eyebrow" style={{ color: 'var(--text-faint)' }}>Battle for {title || 'the lead'}</span>
-        <div className="row between" style={{ marginTop: 10 }}>
-          <span className="rc-card__title" style={{ fontSize: 22 }}>{a}</span>
-          <span className="rc-card__title" style={{ fontSize: 22, color: 'var(--gain)' }}>{delta}</span>
-          <span className="rc-card__title" style={{ fontSize: 22 }}>{b}</span>
+        <div className="row between" style={{ marginTop: 10, gap: 6 }}>
+          <span className="rc-card__title" style={{ fontSize: 18, ...clip }}>{a}</span>
+          <span className="rc-card__title" style={{ fontSize: 16, color: 'var(--gain)', flex: 'none' }}>{delta}</span>
+          <span className="rc-card__title" style={{ fontSize: 18, textAlign: 'right', ...clip }}>{b}</span>
         </div>
       </Card>
     )
@@ -77,12 +78,12 @@ export function StatusCard(props: {
   if (variant === 'dotd') {
     return (
       <Card variant={variant}>
-        <div className="row between">
-          <div>
-            <div className="rc-card__title" style={{ fontSize: 20, lineHeight: 1.05 }}>Driver of<br />the Day</div>
-            <span className="rc-card__title" style={{ fontSize: 22, marginTop: 10, display: 'block' }}>{driver}</span>
+        <div className="row between" style={{ gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="rc-card__title" style={{ fontSize: 16, lineHeight: 1.05 }}>Driver of<br />the Day</div>
+            <span className="rc-card__title" style={{ fontSize: 18, marginTop: 8, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{driver}</span>
           </div>
-          <Avatar name={driver || '??'} color="var(--caution)" size={48} />
+          <Avatar name={driver || '??'} color="var(--caution)" size={40} />
         </div>
       </Card>
     )

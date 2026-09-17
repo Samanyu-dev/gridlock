@@ -3,7 +3,7 @@ import { Search } from 'lucide-react'
 import { Avatar, FormPill, PriceDelta, Sparkline, Skeleton } from '../../components/bits'
 import { DriverDrawer } from '../team/DriverDrawer'
 import { api } from '../../lib/api'
-import { flagEmoji, money } from '../../lib/format'
+import { money } from '../../lib/format'
 import type { Driver } from '../../lib/types'
 
 const SORTS = [['points', 'Points'], ['form', 'Form'], ['price', 'Price'], ['value', 'Value'], ['ownership', 'Owned']]
@@ -80,7 +80,7 @@ export default function Drivers() {
             </table>
           </div>
         </div>
-        <p className="text-faint" style={{ fontSize: 12, marginTop: 12 }}>{flagEmoji('IT')} All drivers are original & fictional. Tap a row for full analytics.</p>
+        <p className="text-faint" style={{ fontSize: 12, marginTop: 12 }}>Tap a row for full analytics.</p>
       </div>
       <DriverDrawer slug={drawer} selected={false} onClose={() => setDrawer(null)} />
     </div>

@@ -63,7 +63,7 @@ export interface Boost {
   usage_limit: number; activation_period: string; scoring_modifier: Record<string, unknown>
 }
 export interface GameConfig {
-  budget: number; roster: { drivers: number; constructors: number }
+  roster: { drivers: number; constructors: number }
   captain_multiplier: number; free_transfers: number; extra_transfer_cost: number
   rules: Record<string, unknown>; boosts: Boost[]
 }

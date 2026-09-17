@@ -118,7 +118,7 @@ export default function Dashboard() {
             <div className="panel panel-pad g4" style={{ gridColumn: '1 / -1', textAlign: 'center' }}>
               <Sparkles size={22} style={{ color: 'var(--red)' }} />
               <h3 className="section-title" style={{ margin: '10px 0 6px' }}>You haven't built your grid yet</h3>
-              <p className="text-dim" style={{ marginBottom: 16 }}>Draft five drivers and two constructors to join the {meta?.season} season.</p>
+              <p className="text-dim" style={{ marginBottom: 16 }}>Draft ten drivers and two constructors to join the {meta?.season} season.</p>
               <Link to="/team" className="btn btn-primary">Build my team <ArrowRight size={16} /></Link>
             </div>
           )}

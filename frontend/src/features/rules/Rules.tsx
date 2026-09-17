@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
-import { money } from '../../lib/format'
 import type { Boost, GameConfig } from '../../lib/types'
 
 interface RulesData { config: GameConfig; rules: Record<string, number | Record<string, number>>; boosts: Boost[] }
@@ -44,8 +43,7 @@ export default function Rules() {
 
         <Section title="Your team">
           <ul className="col gap-1" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
-            <li>Pick <strong>{data.config.roster.drivers} drivers</strong> and <strong>{data.config.roster.constructors} constructors</strong>.</li>
-            <li>Stay within a <strong>{money(data.config.budget)}</strong> budget.</li>
+            <li>Pick <strong>{data.config.roster.drivers} drivers</strong> and <strong>{data.config.roster.constructors} constructors</strong> — no budget, just your best picks.</li>
             <li>Name one <strong>captain</strong> — they score <strong>{data.config.captain_multiplier}×</strong> points.</li>
             <li>You get <strong>{data.config.free_transfers} free transfers</strong> each round; extra transfers cost <strong>{data.config.extra_transfer_cost} pts</strong>.</li>
             <li>Your team <strong>locks at qualifying</strong>. All validation happens server-side.</li>

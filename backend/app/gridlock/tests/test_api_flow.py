@@ -27,7 +27,7 @@ def _affordable_team(c):
     ds = c.get("/api/drivers?sort=price&order=asc").json()["drivers"]
     cs = c.get("/api/constructors?sort=price&order=asc").json()["constructors"]
     return {
-        "driver_ids": [d["id"] for d in ds[:5]],
+        "driver_ids": [d["id"] for d in ds[:10]],
         "constructor_ids": [cs[0]["id"], cs[1]["id"]],
         "captain_id": ds[0]["id"],
         "active_boost": None,
@@ -83,7 +83,7 @@ def test_team_save_requires_auth_and_scores_from_ledger(client):
     # Auditable weekend score comes from the ledger with a score state.
     score = client.get("/api/team/score", headers=hdr).json()
     assert score["state"] in ("live", "provisional", "final")
-    assert "assets" in score and len(score["assets"]) == 7
+    assert "assets" in score and len(score["assets"]) == 12
     # captain multiplier reflected on the captain asset
     cap_asset = next(a for a in score["assets"] if a["ref"] == f"driver:{team['captain_id']}")
     assert cap_asset["multiplier"] == 1.5

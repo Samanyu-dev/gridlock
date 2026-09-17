@@ -19,8 +19,7 @@ from .season import Season
 UTC = timezone.utc
 
 CAPTAIN_MULTIPLIER = 1.5
-BUDGET = 100.0
-ROSTER = {"drivers": 5, "constructors": 2}
+ROSTER = {"drivers": 10, "constructors": 2}
 FREE_TRANSFERS = 2
 MAX_STORED_TRANSFERS = 4
 EXTRA_TRANSFER_COST = 5
@@ -120,8 +119,8 @@ class GameStore:
     def _compute_theoretical_max(self) -> float:
         s = self._season
         assert s is not None
-        top_d = sorted(s.drivers.values(), key=lambda d: d.points, reverse=True)[:5]
-        top_c = sorted(s.constructors.values(), key=lambda c: c.points, reverse=True)[:2]
+        top_d = sorted(s.drivers.values(), key=lambda d: d.points, reverse=True)[:ROSTER["drivers"]]
+        top_c = sorted(s.constructors.values(), key=lambda c: c.points, reverse=True)[:ROSTER["constructors"]]
         cap = max(d.points for d in top_d) if top_d else 0
         return sum(d.points for d in top_d) + sum(c.points for c in top_c) + cap
 
@@ -156,6 +155,7 @@ class GameStore:
         }
 
     def team_cost(self, driver_ids: List[int], constructor_ids: List[int]) -> float:
+        """Squad value — informational only; there is no budget cap to spend against."""
         s = self.season
         cost = sum(s.drivers[d].price for d in driver_ids if d in s.drivers)
         cost += sum(s.constructors[c].price for c in constructor_ids if c in s.constructors)
@@ -164,7 +164,8 @@ class GameStore:
     def validate_team(
         self, driver_ids: List[int], constructor_ids: List[int], captain_id: Optional[int]
     ) -> Tuple[bool, List[str]]:
-        """Authoritative, server-side team validation."""
+        """Authoritative, server-side team validation. Budget is unlimited — the
+        only constraints are roster size and picking real, distinct assets."""
         s = self.season
         errors: List[str] = []
         if len(driver_ids) != ROSTER["drivers"]:
@@ -183,9 +184,6 @@ class GameStore:
                 errors.append(f"Unknown constructor {c}.")
         if captain_id is not None and captain_id not in driver_ids:
             errors.append("Captain must be one of your selected drivers.")
-        cost = self.team_cost(driver_ids, constructor_ids)
-        if cost > BUDGET + 1e-6:
-            errors.append(f"Over budget: ${cost:.1f}M of ${BUDGET:.0f}M.")
         return (len(errors) == 0, errors)
 
     # -- demo managers + leaderboard ----------------------------------------
@@ -425,7 +423,6 @@ STORE = GameStore()
 
 def scoring_config() -> dict:
     return {
-        "budget": BUDGET,
         "roster": ROSTER,
         "captain_multiplier": CAPTAIN_MULTIPLIER,
         "free_transfers": FREE_TRANSFERS,

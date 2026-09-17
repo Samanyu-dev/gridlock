@@ -7,10 +7,11 @@ and two constructors under a strict budget, name a captain, arm tactical boosts,
 make transfers, follow a live race centre, spin up private leagues, and climb a
 global grid — all with a cinematic, motorsport-first, mobile-first interface.
 
-> All drivers, constructors, circuits and results are **original and fictional**.
-> GRIDLOCK is not affiliated with, endorsed by, or derived from any real racing
-> series, team, or driver. It is **free-to-play** — there is no real-money
-> wagering, deposits, or withdrawals.
+> GRIDLOCK is an unofficial fan project for a private group of friends. Driver,
+> team and circuit data reflects the real Formula 1 grid (sourced via the
+> OpenF1 API) but the product itself is not affiliated with, endorsed by, or
+> derived from Formula 1 or any team/driver named here. It is **free-to-play**
+> — there is no real-money wagering, deposits, or withdrawals.
 
 The product name is centralised (`product` in the API meta + the `Brand`
 component) so it can be rebranded later.
@@ -35,7 +36,7 @@ backend/app/
   moderation.py           Username / team-name guard
   gridlock/
     scoring.py            FantasyScoringEngine — pure, deterministic, config-driven
-    season.py             Seeded season: original drivers/constructors/circuits +
+    season.py             Seeded season: real 2026 F1 drivers/constructors/circuits +
                           deterministic race simulation → points, form, prices
     provider.py           MotorsportDataProvider adapter (Mock / Real switch)
     store.py              Cached season, demo managers/leagues, insights, live race

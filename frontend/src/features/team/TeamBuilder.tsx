@@ -41,30 +41,28 @@ export default function TeamBuilder() {
 
   const dMap = useMemo(() => new Map(drivers.map((d) => [d.id, d])), [drivers])
   const cMap = useMemo(() => new Map(constructors.map((c) => [c.id, c])), [constructors])
-  const budget = meta?.config.budget ?? 100
-  const maxD = meta?.config.roster.drivers ?? 5
+  const maxD = meta?.config.roster.drivers ?? 10
   const maxC = meta?.config.roster.constructors ?? 2
 
-  const cost = useMemo(() => {
+  const squadValue = useMemo(() => {
     let c = 0
     selDrivers.forEach((id) => (c += dMap.get(id)?.price ?? 0))
     selConstructors.forEach((id) => (c += cMap.get(id)?.price ?? 0))
     return Math.round(c * 10) / 10
   }, [selDrivers, selConstructors, dMap, cMap])
-  const remaining = Math.round((budget - cost) * 10) / 10
   const complete = selDrivers.length === maxD && selConstructors.length === maxC
 
   const toggleDriver = (d: Driver) => {
     if (selDrivers.includes(d.id)) {
       setSelDrivers((s) => s.filter((x) => x !== d.id))
       if (captain === d.id) setCaptain(null)
-    } else if (selDrivers.length < maxD && remaining - d.price >= -1e-6) {
+    } else if (selDrivers.length < maxD) {
       setSelDrivers((s) => [...s, d.id])
     }
   }
   const toggleConstructor = (c: Constructor) => {
     if (selConstructors.includes(c.id)) setSelConstructors((s) => s.filter((x) => x !== c.id))
-    else if (selConstructors.length < maxC && remaining - c.price >= -1e-6) setSelConstructors((s) => [...s, c.id])
+    else if (selConstructors.length < maxC) setSelConstructors((s) => [...s, c.id])
   }
 
   const filtered = useMemo(() => {
@@ -93,8 +91,6 @@ export default function TeamBuilder() {
     finally { setSaving(false) }
   }
 
-  const warn = remaining < 0
-
   return (
     <div className="page">
       <div className="container">
@@ -109,53 +105,62 @@ export default function TeamBuilder() {
           </div>
         </div>
 
-        {/* Sticky budget bar */}
+        {/* Sticky squad-progress bar — no budget cap, just fill the grid. */}
         <div className="panel panel-pad" style={{ position: 'sticky', top: 68, zIndex: 12, marginBottom: 20 }}>
           <div className="row between wrap gap-2">
             <div className="row gap-4">
-              <div><div className="eyebrow">Budget</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
-                {money(cost)} <span className="text-faint" style={{ fontSize: 14 }}>/ {money(budget)}</span></div></div>
-              <div><div className="eyebrow">Remaining</div><div className="num" style={{ fontWeight: 800, fontSize: 22, color: warn ? 'var(--loss)' : 'var(--gain)' }}>
-                <CountUp value={remaining} decimals={1} prefix="$" suffix="M" /></div></div>
-              <div className="hide-mobile"><div className="eyebrow">Squad</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
-                {selDrivers.length + selConstructors.length}/{maxD + maxC}</div></div>
+              <div><div className="eyebrow">Squad</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
+                <CountUp value={selDrivers.length + selConstructors.length} /> <span className="text-faint" style={{ fontSize: 14 }}>/ {maxD + maxC}</span></div></div>
+              <div className="hide-mobile"><div className="eyebrow">Squad value</div><div className="num" style={{ fontWeight: 800, fontSize: 22 }}>
+                {money(squadValue)}</div></div>
             </div>
-            <button className="btn btn-primary" disabled={!complete || warn || saving} onClick={save}>
+            <button className="btn btn-primary" disabled={!complete || saving} onClick={save}>
               {saving ? 'Saving…' : complete ? 'Save team' : `Add ${maxD - selDrivers.length + maxC - selConstructors.length} more`}
             </button>
           </div>
-          <div className={`bar ${warn ? 'warn' : ''}`} style={{ marginTop: 12 }}>
-            <span style={{ width: `${Math.min(100, (cost / budget) * 100)}%` }} />
+          <div className="bar" style={{ marginTop: 12 }}>
+            <span style={{ width: `${Math.min(100, ((selDrivers.length + selConstructors.length) / (maxD + maxC)) * 100)}%` }} />
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }} className="tb-grid">
           {/* LINEUP */}
           <div style={{ display: view === 'lineup' ? 'block' : undefined }} className={view === 'market' ? 'hide-mobile' : ''}>
-            <span className="eyebrow">Drivers · {selDrivers.length}/{maxD}</span>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', marginTop: 10, marginBottom: 20 }}>
-              {Array.from({ length: maxD }).map((_, i) => {
-                const d = dMap.get(selDrivers[i])
-                return (
-                  <motion.div key={i} layout className="panel" style={{ padding: 12, minHeight: 128, position: 'relative', borderColor: d ? d.constructor.color + '66' : undefined }}>
-                    {d ? (
-                      <div className="col center" style={{ gap: 6, textAlign: 'center' }}>
-                        <button onClick={() => setCaptain(captain === d.id ? null : d.id)} title="Captain"
-                          style={{ position: 'absolute', top: 6, left: 6, width: 24, height: 24, borderRadius: 6, border: 'none',
-                            background: captain === d.id ? 'var(--red)' : 'var(--surface-3)', color: '#fff', fontWeight: 800, fontSize: 12 }}>C</button>
-                        <button onClick={() => toggleDriver(d)} style={{ position: 'absolute', top: 6, right: 6, background: 'transparent', border: 'none', color: 'var(--text-faint)' }}><X size={15} /></button>
-                        <Avatar name={d.name} number={d.number} color={d.constructor.color} size={46} />
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{d.short}</div>
-                        <div className="eyebrow">{money(d.price)}</div>
-                      </div>
-                    ) : (
-                      <button onClick={() => setView('market')} className="col center grow" style={{ width: '100%', height: '100%', background: 'transparent', border: '1px dashed var(--line)', borderRadius: 8, color: 'var(--text-faint)', gap: 6, minHeight: 104 }}>
-                        <Plus size={22} /><span className="eyebrow">Add driver</span>
-                      </button>
-                    )}
-                  </motion.div>
-                )
-              })}
+            <span className="eyebrow">Starting grid · {selDrivers.length}/{maxD}</span>
+            <div className="starting-grid" style={{ marginTop: 10, marginBottom: 24 }}>
+              <div className="starting-grid__flag" />
+              <div className="starting-grid__track" />
+              {Array.from({ length: Math.ceil(maxD / 2) }).map((_, row) => (
+                <div key={row} className="grid-row-pair">
+                  {[row * 2, row * 2 + 1].map((i) => {
+                    if (i >= maxD) return null
+                    const d = dMap.get(selDrivers[i])
+                    return (
+                      <motion.div key={i} layout className={`grid-box${i % 2 ? ' grid-box--right' : ''}${d ? '' : ' grid-box--empty'}`}
+                        style={{ borderColor: d ? d.constructor.color + '66' : undefined }}
+                        onClick={d ? undefined : () => setView('market')}>
+                        <span className="grid-box__pos">P{i + 1}</span>
+                        {d ? (
+                          <>
+                            <button onClick={(e) => { e.stopPropagation(); setCaptain(captain === d.id ? null : d.id) }} title="Captain"
+                              style={{ position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 8, border: 'none',
+                                background: captain === d.id ? 'var(--red)' : 'var(--surface-3)', color: '#fff', fontWeight: 800, fontSize: 12, boxShadow: 'var(--neo-raised-sm)' }}>C</button>
+                            <button onClick={(e) => { e.stopPropagation(); toggleDriver(d) }} style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', color: 'var(--text-faint)' }}><X size={15} /></button>
+                            <Avatar name={d.name} number={d.number} color={d.constructor.color} size={44} />
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{d.short}</div>
+                            <div className="eyebrow">{d.constructor.short}</div>
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={20} />
+                            <span className="eyebrow">Add driver</span>
+                          </>
+                        )}
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
 
             <span className="eyebrow">Constructors · {selConstructors.length}/{maxC}</span>
@@ -204,9 +209,9 @@ export default function TeamBuilder() {
                 <div className="panel" style={{ overflow: 'hidden' }}>
                   {filtered.map((d) => {
                     const sel = selDrivers.includes(d.id)
-                    const afford = sel || (selDrivers.length < maxD && remaining - d.price >= -1e-6)
+                    const roomLeft = sel || selDrivers.length < maxD
                     return (
-                      <div key={d.id} className="row between race-edge" style={{ ['--accent' as string]: d.constructor.color, padding: '10px 12px 10px 16px', borderBottom: '1px solid var(--line-soft)', opacity: afford ? 1 : 0.45 }}>
+                      <div key={d.id} className="row between race-edge" style={{ ['--accent' as string]: d.constructor.color, padding: '10px 12px 10px 16px', borderBottom: '1px solid var(--line-soft)', opacity: roomLeft ? 1 : 0.45 }}>
                         <button className="row gap-2 grow" style={{ background: 'transparent', border: 'none', color: 'var(--text)', textAlign: 'left' }} onClick={() => setDrawer(d.slug)}>
                           <Avatar name={d.name} number={d.number} color={d.constructor.color} size={38} />
                           <div className="col">
@@ -220,7 +225,7 @@ export default function TeamBuilder() {
                             <span className="num" style={{ fontWeight: 700 }}>{money(d.price)}</span>
                             <PriceDelta value={d.price_delta} />
                           </div>
-                          <button className={`btn btn-sm ${sel ? 'btn-ghost' : 'btn-primary'}`} disabled={!afford} onClick={() => toggleDriver(d)} style={{ padding: 8 }}>
+                          <button className={`btn btn-sm ${sel ? 'btn-ghost' : 'btn-primary'}`} disabled={!roomLeft} onClick={() => toggleDriver(d)} style={{ padding: 8 }}>
                             {sel ? <Check size={15} /> : <Plus size={15} />}
                           </button>
                         </div>
@@ -235,13 +240,13 @@ export default function TeamBuilder() {
               <div className="panel" style={{ overflow: 'hidden' }}>
                 {constructors.map((c) => {
                   const sel = selConstructors.includes(c.id)
-                  const afford = sel || (selConstructors.length < maxC && remaining - c.price >= -1e-6)
+                  const roomLeft = sel || selConstructors.length < maxC
                   return (
-                    <div key={c.id} className="row between race-edge" style={{ ['--accent' as string]: c.color, padding: '12px 12px 12px 16px', borderBottom: '1px solid var(--line-soft)', opacity: afford ? 1 : 0.45 }}>
+                    <div key={c.id} className="row between race-edge" style={{ ['--accent' as string]: c.color, padding: '12px 12px 12px 16px', borderBottom: '1px solid var(--line-soft)', opacity: roomLeft ? 1 : 0.45 }}>
                       <div className="col"><span style={{ fontWeight: 600 }}>{c.name}</span><span className="eyebrow">{c.points} pts · {c.reliability}% reliability · {c.ownership}% owned</span></div>
                       <div className="row gap-3">
                         <div className="col" style={{ alignItems: 'flex-end' }}><span className="num" style={{ fontWeight: 700 }}>{money(c.price)}</span><PriceDelta value={c.price_delta} /></div>
-                        <button className={`btn btn-sm ${sel ? 'btn-ghost' : 'btn-primary'}`} disabled={!afford} onClick={() => toggleConstructor(c)} style={{ padding: 8 }}>
+                        <button className={`btn btn-sm ${sel ? 'btn-ghost' : 'btn-primary'}`} disabled={!roomLeft} onClick={() => toggleConstructor(c)} style={{ padding: 8 }}>
                           {sel ? <Check size={15} /> : <Plus size={15} />}
                         </button>
                       </div>
