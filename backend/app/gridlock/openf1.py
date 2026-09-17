@@ -80,7 +80,7 @@ class OpenF1Provider(MotorsportDataProvider):
     live = True
 
     def __init__(self, year: Optional[int] = None) -> None:
-        self.year = year or int(os.environ.get("GRIDLOCK_SEASON_YEAR", "2024"))
+        self.year = year or int(os.environ.get("GRIDLOCK_SEASON_YEAR", "2026"))
         self.client = OpenF1Client()
         self._season: Optional[Season] = None
         self.last_error: Optional[str] = None

@@ -45,9 +45,14 @@ export default function Rules() {
           <ul className="col gap-1" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
             <li>Pick <strong>{data.config.roster.drivers} drivers</strong> and <strong>{data.config.roster.constructors} constructors</strong> — no budget, just your best picks.</li>
             <li>Name one <strong>captain</strong> — they score <strong>{data.config.captain_multiplier}×</strong> points.</li>
-            <li>You get <strong>{data.config.free_transfers} free transfers</strong> each round; extra transfers cost <strong>{data.config.extra_transfer_cost} pts</strong>.</li>
+            <li>You get <strong>{data.config.free_transfers} free transfer</strong> before each round locks; extra changes cost <strong>{data.config.extra_transfer_cost} pts</strong> each.</li>
             <li>Your team <strong>locks at qualifying</strong>. All validation happens server-side.</li>
+            <li>Arm the <strong>Underdog</strong> boost on a driver — if they finish P6–P10, that driver scores double for the round.</li>
           </ul>
+        </Section>
+
+        <Section title="Worked example">
+          <ExampleWalkthrough finish={finish} quali={quali} rules={r} captainMultiplier={data.config.captain_multiplier} />
         </Section>
 
         <div className="grid g2" style={{ marginBottom: 20 }}>
@@ -104,6 +109,62 @@ function PointsTable({ title, table, color }: { title: string; table: Record<str
             <span className={`pos pos-${pos}`}>P{pos}</span><span className="num" style={{ fontWeight: 700, color }}>+{pts}</span>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function ExampleWalkthrough({ finish, quali, rules, captainMultiplier }: {
+  finish: Record<string, number>; quali: Record<string, number>
+  rules: Record<string, number | Record<string, number>>; captainMultiplier: number
+}) {
+  // A believable weekend: qualifies P5, beats teammate, gains 3 places to
+  // finish P2, sets the fastest lap, and is your captain.
+  const qualiPts = quali['5'] ?? 0
+  const beatTeammateQuali = rules.quali_beat_teammate as number
+  const finishPts = finish['2'] ?? 0
+  const gained = 3
+  const gainedPts = gained * (rules.position_gained as number)
+  const fastestLap = rules.fastest_lap as number
+  const classified = rules.classified as number
+  const base = qualiPts + beatTeammateQuali + finishPts + gainedPts + fastestLap + classified
+  const captainBonus = base * (captainMultiplier - 1)
+  const total = base + captainBonus
+
+  const rows: [string, number][] = [
+    ['Qualifies P5', qualiPts],
+    ['Beats teammate in qualifying', beatTeammateQuali],
+    ['Finishes P2 (from P5 on the grid)', finishPts],
+    [`Gains ${gained} places (grid → finish)`, gainedPts],
+    ['Sets the fastest lap', fastestLap],
+    ['Classified finish', classified],
+  ]
+
+  return (
+    <div>
+      <p className="text-dim" style={{ fontSize: 14, marginBottom: 12 }}>
+        Say you start <strong>your captain</strong> and they qualify P5, out-qualify their teammate, then gain 3 places
+        to finish P2 with the race's fastest lap. Here's exactly how that scores:
+      </p>
+      <div className="col gap-1">
+        {rows.map(([label, pts]) => (
+          <div key={label} className="row between" style={{ padding: '7px 12px', background: 'var(--surface-2)', borderRadius: 6 }}>
+            <span style={{ fontSize: 13 }}>{label}</span>
+            <span className="num" style={{ fontWeight: 700, color: 'var(--gain)' }}>+{pts}</span>
+          </div>
+        ))}
+        <div className="row between" style={{ padding: '7px 12px' }}>
+          <span className="eyebrow">Base total</span>
+          <span className="num" style={{ fontWeight: 700 }}>{base}</span>
+        </div>
+        <div className="row between" style={{ padding: '7px 12px', background: 'var(--surface-2)', borderRadius: 6 }}>
+          <span style={{ fontSize: 13 }}>Captain bonus ({captainMultiplier}×)</span>
+          <span className="num" style={{ fontWeight: 700, color: 'var(--gain)' }}>+{Math.round(captainBonus * 10) / 10}</span>
+        </div>
+        <div className="row between" style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 8, marginTop: 4 }}>
+          <span style={{ fontWeight: 700 }}>Total for the round</span>
+          <span className="num" style={{ fontWeight: 800, fontSize: 18 }}>{Math.round(total * 10) / 10}</span>
+        </div>
       </div>
     </div>
   )

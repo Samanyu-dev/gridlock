@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Layers, Infinity as Inf, Shuffle, Wrench, type LucideIcon } from 'lucide-react'
+import { Zap, Layers, Infinity as Inf, Shuffle, Wrench, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { Boost } from '../../lib/types'
 
 const ICONS: Record<string, LucideIcon> = {
-  zap: Zap, layers: Layers, infinity: Inf, shuffle: Shuffle, wrench: Wrench,
+  zap: Zap, layers: Layers, infinity: Inf, shuffle: Shuffle, wrench: Wrench, 'trending-up': TrendingUp,
 }
 
 /** Press-and-hold to arm a tactical boost — a car accelerates across the fill. */

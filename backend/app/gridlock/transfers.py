@@ -72,13 +72,9 @@ def save_team(
         transfers = _diff(team.driver_ids, driver_ids) + _diff(team.constructor_ids, constructor_ids)
 
     free_available = team.free_transfers if team else FREE_TRANSFERS
-    unlimited = active_boost in ("wildcard", "free-hit")
-    if unlimited:
-        free_used, penalized, penalty = transfers, 0, 0
-    else:
-        free_used = min(transfers, free_available)
-        penalized = max(0, transfers - free_available)
-        penalty = penalized * EXTRA_TRANSFER_COST
+    free_used = min(transfers, free_available)
+    penalized = max(0, transfers - free_available)
+    penalty = penalized * EXTRA_TRANSFER_COST
 
     # --- atomic write ---
     try:
@@ -86,7 +82,7 @@ def save_team(
             team = GLTeam(profile_id=profile_id, free_transfers=FREE_TRANSFERS)
 
         # Record individual transfers (sold assets) for audit.
-        if not first_pick and not unlimited:
+        if not first_pick:
             sold_drivers = set(team.driver_ids) - set(driver_ids)
             bought_drivers = list(set(driver_ids) - set(team.driver_ids))
             for i, sold in enumerate(sold_drivers):
@@ -107,7 +103,7 @@ def save_team(
         team.boost_constructor_id = boost_constructor_id
         team.team_value = STORE.team_cost(driver_ids, constructor_ids)
         team.bank = 0.0  # no budget cap — nothing to have "remaining"
-        if not first_pick and not unlimited:
+        if not first_pick:
             # Consume free transfers; unused roll over (capped) on round rollover.
             team.free_transfers = max(0, free_available - free_used)
         team.updated_at = datetime.utcnow()

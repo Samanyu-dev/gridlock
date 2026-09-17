@@ -2,8 +2,8 @@
 network. Proves the mapping into GRIDLOCK domain objects is correct and tolerant
 of missing fields."""
 from app.gridlock.normalize import (
-    build_driver_result, fastest_lap_driver, group_constructors,
-    normalize_season, normalize_status, pit_rank_map,
+    build_driver_result, fastest_lap_driver, normalize_season,
+    normalize_status, pit_rank_map, weather_label,
 )
 from app.gridlock.scoring import DNF, DNS, DSQ, FINISHED
 
@@ -29,18 +29,6 @@ def test_fastest_lap_ignores_pit_out_and_missing():
     assert fastest_lap_driver([]) is None
 
 
-def test_group_constructors():
-    rows = [
-        {"driver_number": 1, "team_name": "Red Squad", "team_colour": "FF0000"},
-        {"driver_number": 11, "team_name": "Red Squad", "team_colour": "FF0000"},
-        {"driver_number": 44, "team_name": "Blue Squad", "team_colour": "0000FF"},
-    ]
-    teams = group_constructors(rows)
-    assert set(teams) == {"Red Squad", "Blue Squad"}
-    assert teams["Red Squad"]["drivers"] == [1, 11]
-    assert teams["Red Squad"]["color"] == "#FF0000"
-
-
 def test_pit_rank_only_uses_reliable_durations():
     pits = [
         {"driver_number": 1, "pit_duration": 22.1},
@@ -51,6 +39,14 @@ def test_pit_rank_only_uses_reliable_durations():
     ranks = pit_rank_map(pits)
     assert ranks == {44: 1, 1: 2}
     assert 16 not in ranks
+
+
+def test_weather_label_from_last_reading():
+    assert weather_label([]) == "—"
+    assert weather_label([{"rainfall": 0, "air_temperature": 32}]) == "Dry · Hot"
+    assert weather_label([{"rainfall": 0, "air_temperature": 24}]) == "Dry · Warm"
+    assert weather_label([{"rainfall": 0, "air_temperature": 15}]) == "Overcast"
+    assert weather_label([{"rainfall": 2, "air_temperature": 20}]) == "Wet"
 
 
 def test_build_driver_result_positions_and_status():
@@ -66,42 +62,50 @@ def test_build_driver_result_positions_and_status():
 
 
 class _FakeClient:
-    """Minimal OpenF1 stand-in returning fixture payloads."""
+    """Minimal OpenF1 stand-in returning fixture payloads for one completed
+    Grand Prix weekend (driver numbers 1=Norris, 44=Hamilton — real 2026 grid
+    numbers, since identity now comes from our curated grid, not the API)."""
+    def meetings(self, **p):
+        return [{
+            "meeting_key": 10, "meeting_name": "Fixture Grand Prix",
+            "country_code": "BRN", "is_cancelled": False,
+            "date_start": "2026-03-02T15:00:00+00:00",
+        }]
     def sessions(self, **p):
-        if p.get("year"):
-            return [{"session_key": 100, "meeting_key": 10, "session_type": "Race",
-                     "session_name": "Race", "date_start": "2024-03-02T15:00:00+00:00",
-                     "country_name": "Bahrain", "country_code": "BH", "circuit_short_name": "Sakhir",
-                     "location": "Sakhir"}]
-        if p.get("meeting_key"):
-            return [{"session_key": 99, "meeting_key": 10, "session_type": "Qualifying"}]
-        return []
-    def drivers(self, **p):
         return [
-            {"driver_number": 1, "full_name": "A Racer", "name_acronym": "RAC", "team_name": "Red Squad", "team_colour": "FF0000", "country_code": "NL"},
-            {"driver_number": 11, "full_name": "B Racer", "name_acronym": "BRC", "team_name": "Red Squad", "team_colour": "FF0000", "country_code": "ES"},
-            {"driver_number": 44, "full_name": "C Racer", "name_acronym": "CRC", "team_name": "Blue Squad", "team_colour": "0000FF", "country_code": "GB"},
+            {"session_key": 99, "meeting_key": 10, "session_name": "Qualifying"},
+            {"session_key": 100, "meeting_key": 10, "session_name": "Race",
+             "date_start": "2026-03-02T15:00:00+00:00",
+             "circuit_short_name": "Sakhir", "location": "Sakhir"},
         ]
     def session_result(self, **p):
         if p.get("session_key") == 99:  # qualifying
-            return [{"driver_number": 1, "position": 1}, {"driver_number": 11, "position": 3}, {"driver_number": 44, "position": 2}]
-        return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}, {"driver_number": 11, "position": 3}]
+            return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}]
+        return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}]
     def starting_grid(self, **p):
-        return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}, {"driver_number": 11, "position": 3}]
+        return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}]
     def laps(self, **p):
         return [{"driver_number": 1, "lap_duration": 95.1}, {"driver_number": 44, "lap_duration": 94.8}]
     def pit(self, **p):
         return [{"driver_number": 1, "pit_duration": 22.0}, {"driver_number": 44, "pit_duration": 21.5}]
+    def weather(self, **p):
+        return [{"rainfall": 0, "air_temperature": 31}]
 
 
 def test_normalize_season_end_to_end_with_fixtures():
-    season = normalize_season(_FakeClient(), 2024)
+    season = normalize_season(_FakeClient(), 2026)
     assert season is not None
-    assert len(season.drivers) == 3 and len(season.constructors) == 2
+    # Identity always comes from the full curated 2026 grid, regardless of
+    # how few drivers the fixture/API reports results for.
+    assert len(season.drivers) == 22 and len(season.constructors) == 11
     assert len(season.races) == 1 and season.races[0].status == "completed"
-    # winner is driver 1 (finished P1); points were scored via the engine
+    assert season.races[0].weather == "Dry · Hot"
+    # winner is driver 1 (Norris, finished P1); points were scored via the engine
     assert season.races[0].winner_id == 1
     assert season.drivers[1].points > 0
-    # driver 1: quali P1(+12) + classified(+2) + race P1(+30) + fastest lap? 44 was faster
-    # (44 has lower lap_duration) so driver 1 has no FL; still comfortably positive.
+    # driver 44 (Hamilton) had the faster lap, so gets the fastest-lap bonus
+    assert season.races[0].fastest_lap_id == 44
     assert season.drivers[44].round_breakdown[1]  # ledger recorded
+    # drivers with no result row this round (everyone else) are simply DNS,
+    # never invented — no points, no crash.
+    assert season.drivers[16].points == 0

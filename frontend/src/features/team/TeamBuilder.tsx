@@ -20,6 +20,7 @@ export default function TeamBuilder() {
   const [selConstructors, setSelConstructors] = useState<number[]>([])
   const [captain, setCaptain] = useState<number | null>(null)
   const [boost, setBoost] = useState<string | null>(null)
+  const [boostDriver, setBoostDriver] = useState<number | null>(null)
   const [view, setView] = useState<'lineup' | 'market'>('lineup')
   const [tab, setTab] = useState<'drivers' | 'constructors'>('drivers')
   const [sort, setSort] = useState('points')
@@ -34,7 +35,7 @@ export default function TeamBuilder() {
     if (authed) api.me().then((m) => {
       if (m.team) {
         setSelDrivers(m.team.driver_ids); setSelConstructors(m.team.constructor_ids)
-        setCaptain(m.team.captain_id); setBoost(m.team.active_boost)
+        setCaptain(m.team.captain_id); setBoost(m.team.active_boost); setBoostDriver(m.team.boost_driver_id ?? null)
       }
     }).catch(() => {})
   }, [authed])
@@ -81,7 +82,7 @@ export default function TeamBuilder() {
     try {
       const res = await api.saveTeam({
         driver_ids: selDrivers, constructor_ids: selConstructors,
-        captain_id: captain, active_boost: boost,
+        captain_id: captain, active_boost: boost, boost_driver_id: boost ? boostDriver : null,
       })
       const t = res.transfers
       const penaltyNote = t && t.penalty ? ` · ${t.penalized} extra transfer${t.penalized > 1 ? 's' : ''} (−${t.penalty} pts)` : ''
@@ -184,7 +185,25 @@ export default function TeamBuilder() {
               })}
             </div>
 
-            <BoostBar boosts={meta?.config.boosts || []} active={boost} onSelect={setBoost} />
+            <BoostBar boosts={meta?.config.boosts || []} active={boost} onSelect={(id) => { setBoost(id); if (!id) setBoostDriver(null) }} />
+
+            {boost === 'underdog' && (
+              <div className="panel panel-pad" style={{ marginTop: 12 }}>
+                <span className="eyebrow">Pick your underdog — scores 2× if they finish P6–P10</span>
+                <div className="row gap-2 wrap" style={{ marginTop: 10 }}>
+                  {selDrivers.map((id) => {
+                    const d = dMap.get(id)
+                    if (!d) return null
+                    const picked = boostDriver === id
+                    return (
+                      <button key={id} className={`btn btn-sm ${picked ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setBoostDriver(picked ? null : id)}>
+                        {d.short}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* MARKET */}

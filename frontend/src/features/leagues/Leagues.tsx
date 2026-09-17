@@ -9,23 +9,21 @@ import type { LeagueSummary } from '../../lib/types'
 export default function Leagues() {
   const { authed } = useSession()
   const navigate = useNavigate()
-  const [pub, setPub] = useState<LeagueSummary[]>([])
   const [mine, setMine] = useState<LeagueSummary[]>([])
   const [modal, setModal] = useState<null | 'create' | 'join'>(null)
   const [joinCode, setJoinCode] = useState('')
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
-  const [privacy, setPrivacy] = useState('private')
   const [type, setType] = useState('classic')
   const [err, setErr] = useState('')
 
-  const load = () => { if (authed) api.leagues().then((r) => { setPub(r.public); setMine(r.mine) }).catch(() => {}) }
+  const load = () => { if (authed) api.leagues().then((r) => setMine(r.mine)).catch(() => {}) }
   useEffect(load, [authed])
 
   const create = async () => {
     setErr('')
     try {
-      const r = await api.createLeague({ name, description: desc, privacy, type })
+      const r = await api.createLeague({ name, description: desc, type })
       navigate(`/leagues/${r.code}`)
     } catch (e) { setErr((e as Error).message) }
   }
@@ -48,29 +46,21 @@ export default function Leagues() {
           </div>
         </div>
 
-        {mine.length > 0 && (
-          <>
-            <span className="eyebrow">Your leagues</span>
-            <div className="grid g2" style={{ margin: '10px 0 28px' }}>
-              {mine.map((l) => <LeagueCard key={l.code} l={l} />)}
-            </div>
-          </>
-        )}
+        <p className="text-dim" style={{ marginBottom: 16, fontSize: 14 }}>Invite-only — leagues here are just for whoever you share a code with. No public browsing.</p>
 
-        <span className="eyebrow">Public leagues</span>
-        {pub.length === 0 ? (
+        {mine.length > 0 ? (
+          <div className="grid g2" style={{ margin: '10px 0 28px' }}>
+            {mine.map((l) => <LeagueCard key={l.code} l={l} />)}
+          </div>
+        ) : (
           <div className="panel empty" style={{ marginTop: 10 }}>
             <Users className="glyph" />
-            <h3 className="section-title" style={{ marginBottom: 6 }}>The paddock is quiet</h3>
-            <p className="text-dim" style={{ marginBottom: 16 }}>No leagues yet — start your own or join with a code.</p>
+            <h3 className="section-title" style={{ marginBottom: 6 }}>No leagues yet</h3>
+            <p className="text-dim" style={{ marginBottom: 16 }}>Start one and share the code with your group.</p>
             <div className="row gap-2 center">
               <button className="btn btn-primary" onClick={() => setModal('create')}>Create league</button>
               <button className="btn btn-ghost" onClick={() => setModal('join')}>Join with code</button>
             </div>
-          </div>
-        ) : (
-          <div className="grid g2" style={{ marginTop: 10 }}>
-            {pub.map((l) => <LeagueCard key={l.code} l={l} />)}
           </div>
         )}
       </div>
@@ -89,10 +79,7 @@ export default function Leagues() {
                 <div className="col gap-2">
                   <div><label className="label">League name</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Late Brakers League" /></div>
                   <div><label className="label">Description</label><input className="input" value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Optional" /></div>
-                  <div className="grid g2">
-                    <div><label className="label">Privacy</label><select className="select" value={privacy} onChange={(e) => setPrivacy(e.target.value)}><option value="private">Private</option><option value="public">Public</option></select></div>
-                    <div><label className="label">Type</label><select className="select" value={type} onChange={(e) => setType(e.target.value)}><option value="classic">Classic</option><option value="h2h">Head-to-head</option></select></div>
-                  </div>
+                  <div><label className="label">Type</label><select className="select" value={type} onChange={(e) => setType(e.target.value)}><option value="classic">Classic</option><option value="h2h">Head-to-head</option></select></div>
                   {err && <span className="chip" style={{ color: 'var(--loss)', borderColor: 'var(--loss)' }}>{err}</span>}
                   <button className="btn btn-primary btn-block" style={{ marginTop: 8 }} disabled={name.trim().length < 3} onClick={create}>Create & get code</button>
                 </div>
@@ -113,7 +100,7 @@ export default function Leagues() {
 
 function LeagueCard({ l }: { l: LeagueSummary }) {
   return (
-    <Link to={`/leagues/${l.code}`} className="panel panel-pad race-edge" style={{ ['--accent' as string]: l.privacy === 'public' ? 'var(--info)' : 'var(--red)' }}>
+    <Link to={`/leagues/${l.code}`} className="panel panel-pad race-edge" style={{ ['--accent' as string]: 'var(--red)' }}>
       <div className="row between">
         <h3 className="section-title" style={{ fontSize: 17 }}>{l.name}</h3>
         <span className="chip" style={{ padding: '2px 7px' }}>{l.type === 'h2h' ? 'H2H' : 'Classic'}</span>

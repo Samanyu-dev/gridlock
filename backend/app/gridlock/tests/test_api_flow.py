@@ -95,7 +95,7 @@ def test_transfer_penalty_after_free_allowance(client):
     team = _affordable_team(client)
     client.put("/api/team", json=team, headers=hdr)
 
-    # Swap 3 drivers -> 2 free, 1 penalized at -5 (default 2 free transfers).
+    # Swap 3 drivers -> 1 free, 2 penalized at -5 each (1 free transfer per round).
     ds = client.get("/api/drivers?sort=price&order=asc").json()["drivers"]
     spare = [d["id"] for d in ds if d["id"] not in team["driver_ids"]][:3]
     new_team = dict(team)
@@ -104,7 +104,7 @@ def test_transfer_penalty_after_free_allowance(client):
     res = client.put("/api/team", json=new_team, headers=hdr)
     assert res.status_code == 200, res.text
     t = res.json()["transfers"]
-    assert t["transfers"] == 3 and t["penalized"] == 1 and t["penalty"] == 5
+    assert t["transfers"] == 3 and t["penalized"] == 2 and t["penalty"] == 10
 
 
 def test_snapshot_created_on_save(client):

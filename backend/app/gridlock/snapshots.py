@@ -18,8 +18,8 @@ from .scoring import ScoreState, round_display
 from .store import CAPTAIN_MULTIPLIER, STORE
 
 UTC = timezone.utc
-TURBO_MULT = 2.0
-PIT_WALL_MULT = 1.5
+UNDERDOG_MULT = 2.0
+UNDERDOG_RANGE = (6, 10)
 
 
 def _round_state(round_id: int) -> str:
@@ -59,10 +59,12 @@ def score_team_for_round(
             mult *= CAPTAIN_MULTIPLIER
             bonus_entries.append({"rule_code": "CAPTAIN", "phase": "bonus", "tag": "bonus",
                                   "label": f"Captain {CAPTAIN_MULTIPLIER:g}×", "points": round_display(subtotal * (CAPTAIN_MULTIPLIER - 1))})
-        if active_boost == "turbo" and boost_driver_id == did and captain_id != did:
-            mult *= TURBO_MULT
-            bonus_entries.append({"rule_code": "TURBO", "phase": "bonus", "tag": "bonus",
-                                  "label": f"Turbo {TURBO_MULT:g}×", "points": round_display(subtotal * (TURBO_MULT - 1))})
+        if active_boost == "underdog" and boost_driver_id == did:
+            finish = d.results.get(round_id, {}).get("finish")
+            if finish is not None and UNDERDOG_RANGE[0] <= finish <= UNDERDOG_RANGE[1]:
+                mult *= UNDERDOG_MULT
+                bonus_entries.append({"rule_code": "UNDERDOG", "phase": "bonus", "tag": "bonus",
+                                      "label": f"Underdog {UNDERDOG_MULT:g}× (P{finish})", "points": round_display(subtotal * (UNDERDOG_MULT - 1))})
         final = round_display(subtotal * mult)
         total += final
         assets.append({
@@ -77,18 +79,12 @@ def score_team_for_round(
             continue
         entries = list(c.round_breakdown.get(round_id, []))
         subtotal = float(c.round_points.get(round_id, 0))
-        mult = 1.0
-        bonus_entries = []
-        if active_boost == "pit-wall" and boost_constructor_id == cid:
-            mult *= PIT_WALL_MULT
-            bonus_entries.append({"rule_code": "PIT_WALL", "phase": "bonus", "tag": "bonus",
-                                  "label": f"Pit Wall {PIT_WALL_MULT:g}×", "points": round_display(subtotal * (PIT_WALL_MULT - 1))})
-        final = round_display(subtotal * mult)
+        final = round_display(subtotal)
         total += final
         assets.append({
             "ref": f"constructor:{cid}", "name": c.name, "short": c.short, "color": c.color,
-            "base": round_display(subtotal), "multiplier": mult, "subtotal": final,
-            "entries": entries + bonus_entries,
+            "base": round_display(subtotal), "multiplier": 1.0, "subtotal": final,
+            "entries": entries,
         })
 
     return {"total": round_display(total), "state": _round_state(round_id), "assets": assets, "round": round_id}

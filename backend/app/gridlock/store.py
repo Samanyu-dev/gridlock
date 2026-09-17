@@ -20,8 +20,8 @@ UTC = timezone.utc
 
 CAPTAIN_MULTIPLIER = 1.5
 ROSTER = {"drivers": 10, "constructors": 2}
-FREE_TRANSFERS = 2
-MAX_STORED_TRANSFERS = 4
+FREE_TRANSFERS = 1
+MAX_STORED_TRANSFERS = 1
 EXTRA_TRANSFER_COST = 5
 
 
@@ -29,31 +29,13 @@ EXTRA_TRANSFER_COST = 5
 # Tactical boosts (config-driven; would live in a DB table in production).
 # --------------------------------------------------------------------------- #
 
-# Tactical boosts (V3). Availability + usage are persisted per profile and
-# activation is locked at the deadline. Config-driven so values can change.
+# One boost: back an underdog. Availability + usage are persisted per profile
+# and activation is locked at the deadline. Config-driven so values can change.
 BOOSTS = [
     {
-        "id": "turbo", "name": "Turbo", "icon": "zap",
-        "description": "A selected non-captain driver scores 2× for the weekend.",
-        "usage_limit": 2, "scoring_modifier": {"type": "driver_multiplier", "value": 2.0},
-        "activation_period": "weekend",
-    },
-    {
-        "id": "pit-wall", "name": "Pit Wall", "icon": "layers",
-        "description": "A selected constructor scores 1.5× for the weekend.",
-        "usage_limit": 2, "scoring_modifier": {"type": "constructor_multiplier", "value": 1.5},
-        "activation_period": "weekend",
-    },
-    {
-        "id": "wildcard", "name": "Wildcard", "icon": "shuffle",
-        "description": "Unlimited free permanent transfers for one round.",
-        "usage_limit": 1, "scoring_modifier": {"type": "unlimited_permanent_transfers"},
-        "activation_period": "round",
-    },
-    {
-        "id": "free-hit", "name": "Free Hit", "icon": "infinity",
-        "description": "Unlimited temporary transfers for one round; your team reverts after.",
-        "usage_limit": 1, "scoring_modifier": {"type": "temporary_transfers"},
+        "id": "underdog", "name": "Underdog", "icon": "trending-up",
+        "description": "Pick a driver you think will finish P6–P10. If they do, they score 2× for the round.",
+        "usage_limit": 3, "scoring_modifier": {"type": "driver_range_multiplier", "value": 2.0, "range": [6, 10]},
         "activation_period": "round",
     },
 ]
@@ -63,17 +45,6 @@ TEAM_NAME_SUGGESTIONS = [
     "Send It Racing", "Purple Sector", "Late Brakers", "DRS Merchants",
     "Box Box Box", "Apex Predators", "Full Send GP", "Undercut Kings",
     "Slipstream Squad", "Gravel Trap FC", "Tyre Whisperers", "Podium Bound",
-]
-
-_MANAGER_FIRST = [
-    "Apex", "Late", "Grid", "Box", "Turbo", "Purple", "Full", "Slick", "Delta",
-    "Chicane", "Downforce", "Redline", "Overcut", "Undercut", "Paddock", "Vapor",
-    "Podium", "Ghost", "Nitro", "Sector", "Halo", "Draft", "Kerb", "Monza",
-]
-_MANAGER_SECOND = [
-    "Hunters", "Brakers", "Bandits", "Kings", "Merchants", "Predators", "Crew",
-    "Union", "Republic", "Society", "Collective", "Dynasty", "Syndicate",
-    "Legends", "Rebels", "Mavericks", "Outlaws", "Pioneers", "Titans", "Aces",
 ]
 
 
@@ -103,26 +74,14 @@ def rank_with_ties(rows: List[dict], key: str) -> None:
 class GameStore:
     def __init__(self) -> None:
         self._season: Optional[Season] = None
-        self._managers: Optional[List[dict]] = None
-        self._leagues: Optional[Dict[str, dict]] = None
-        self._theoretical_max: float = 0.0
 
     @property
     def season(self) -> Season:
         if self._season is None:
             self._season = get_provider().get_season()
-            self._theoretical_max = self._compute_theoretical_max()
         return self._season
 
     # -- team scoring --------------------------------------------------------
-
-    def _compute_theoretical_max(self) -> float:
-        s = self._season
-        assert s is not None
-        top_d = sorted(s.drivers.values(), key=lambda d: d.points, reverse=True)[:ROSTER["drivers"]]
-        top_c = sorted(s.constructors.values(), key=lambda c: c.points, reverse=True)[:ROSTER["constructors"]]
-        cap = max(d.points for d in top_d) if top_d else 0
-        return sum(d.points for d in top_d) + sum(c.points for c in top_c) + cap
 
     def score_team(
         self, driver_ids: List[int], constructor_ids: List[int], captain_id: Optional[int]
@@ -186,101 +145,6 @@ class GameStore:
             errors.append("Captain must be one of your selected drivers.")
         return (len(errors) == 0, errors)
 
-    # -- demo managers + leaderboard ----------------------------------------
-
-    def managers(self) -> List[dict]:
-        if self._managers is None:
-            self._managers = self._build_managers()
-        return self._managers
-
-    def _build_managers(self) -> List[dict]:
-        _ = self.season  # ensure theoretical max computed
-        rng = random.Random(90210)
-        countries = ["GB", "IT", "ES", "NL", "FR", "DE", "BR", "US", "AU", "JP", "MX", "CA"]
-        managers = []
-        used = set()
-        n = 240
-        for i in range(n):
-            while True:
-                name = f"{rng.choice(_MANAGER_FIRST)} {rng.choice(_MANAGER_SECOND)}"
-                if name not in used:
-                    used.add(name)
-                    break
-            # Spread totals across a believable band of the theoretical max.
-            frac = 0.96 - (i / n) * 0.42 + rng.uniform(-0.02, 0.02)
-            total = int(self._theoretical_max * max(0.4, min(0.99, frac)))
-            last = int(total / max(1, self.season.next_round - 1) * rng.uniform(0.7, 1.4))
-            managers.append({
-                "rank": 0,
-                "team_name": name,
-                "manager": f"@{name.split()[0].lower()}{rng.randint(10, 99)}",
-                "country": rng.choice(countries),
-                "total": total,
-                "last_race": last,
-                "movement": rng.randint(-8, 12),
-            })
-        managers.sort(key=lambda m: m["total"], reverse=True)
-        rank_with_ties(managers, "total")
-        return managers
-
-    def rank_for_total(self, total: int) -> Tuple[int, int]:
-        """Return (rank, field_size) for a given points total among managers."""
-        managers = self.managers()
-        rank = 1 + sum(1 for m in managers if m["total"] > total)
-        return rank, len(managers) + 1
-
-    def round_leaderboard(self, offset: int = 0, limit: int = 25) -> List[dict]:
-        """This-round-only ranking (spec: RACE LEADERBOARD), ties sharing a rank."""
-        rows = [dict(m) for m in self.managers()]
-        rows.sort(key=lambda m: m["last_race"], reverse=True)
-        rank_with_ties(rows, "last_race")
-        return rows[offset: offset + limit]
-
-    def rank_for_round(self, points: float) -> int:
-        """Round-only rank for an arbitrary points total among demo managers."""
-        return 1 + sum(1 for m in self.managers() if m["last_race"] > points)
-
-    # -- public leagues ------------------------------------------------------
-
-    def public_leagues(self) -> Dict[str, dict]:
-        if self._leagues is None:
-            self._leagues = self._build_leagues()
-        return self._leagues
-
-    def _build_leagues(self) -> Dict[str, dict]:
-        rng = random.Random(1337)
-        managers = self.managers()
-        names = [
-            ("Overall Championship", "The global classic league — everyone's in."),
-            ("Rookie Paddock", "New this season? Start here."),
-            ("Purple Sector Club", "For the fastest-lap chasers."),
-            ("Undercut Society", "Transfer strategists only."),
-            ("Backmarker Heroes", "Budget-build believers."),
-            ("Podium Hunters", "Top-3 or bust."),
-        ]
-        leagues: Dict[str, dict] = {}
-        for i, (name, desc) in enumerate(names):
-            code = _league_code(rng)
-            members = rng.sample(managers, k=rng.randint(18, 60))
-            members = sorted(members, key=lambda m: m["total"], reverse=True)
-            members = [dict(m) for m in members]
-            for m in members:
-                m["league_rank"] = 0
-            rank_with_ties(members, "total")
-            for m in members:
-                m["league_rank"] = m.pop("rank")
-            leagues[code] = {
-                "code": code,
-                "name": name,
-                "description": desc,
-                "privacy": "public",
-                "type": "classic",
-                "creator": members[0]["team_name"] if members else "GRIDLOCK",
-                "member_count": len(members),
-                "members": members,
-            }
-        return leagues
-
     # -- insights engine (deterministic, no LLM) -----------------------------
 
     def insights(self) -> List[dict]:
@@ -322,8 +186,6 @@ class GameStore:
         best_con = min(s.constructors.values(), key=lambda c: 1 - c.reliability)
         out.append({"type": "constructor", "text": f"{best_con.name} has the season's strongest reliability record."})
 
-        for o in out:
-            o["demo"] = True
         return out
 
     # -- live race snapshot --------------------------------------------------

@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ArrowLeft, Check, Shuffle } from 'lucide-react'
 import { Brand } from '../../components/Brand'
 import { RacingLine } from '../../components/RacingLine'
-import { Avatar } from '../../components/bits'
 import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { flagEmoji, money } from '../../lib/format'
@@ -126,11 +125,14 @@ export default function Onboarding() {
                       const sel = favDrivers.includes(d.id)
                       return (
                         <button key={d.id} onClick={() => toggleDriver(d.id)}
-                          className="panel" style={{ padding: 12, textAlign: 'center', cursor: 'pointer', borderColor: sel ? d.constructor.color : undefined, position: 'relative' }}>
-                          {sel && <span style={{ position: 'absolute', top: 6, right: 6, color: 'var(--gain)' }}><Check size={16} /></span>}
-                          <Avatar name={d.name} number={d.number} color={d.constructor.color} size={48} image={d.image_url} />
-                          <div style={{ fontWeight: 600, fontSize: 13, marginTop: 8 }}>{d.short}</div>
-                          <div className="eyebrow">{flagEmoji(d.country)} {d.constructor.short}</div>
+                          className={`driver-pick-card${sel ? ' selected' : ''}`}>
+                          <img className="driver-pick-card__photo" src={d.image_url} alt={d.name} style={{ background: d.constructor.color }} />
+                          <span className="driver-pick-card__scrim" aria-hidden />
+                          {sel && <span className="driver-pick-card__check"><Check size={14} /></span>}
+                          <span className="driver-pick-card__info">
+                            <div style={{ fontWeight: 700, fontSize: 13 }}>{d.short}</div>
+                            <div className="eyebrow" style={{ opacity: 0.85 }}>{flagEmoji(d.country)} {d.constructor.short}</div>
+                          </span>
                         </button>
                       )
                     })}

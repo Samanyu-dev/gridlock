@@ -549,9 +549,12 @@ def _quali_rows(quali_order, drivers, constructors):
     return rows
 
 
-def _finalize_metrics(drivers: Dict[int, Driver], constructors: Dict[int, Constructor]):
+def _finalize_metrics(
+    drivers: Dict[int, Driver], constructors: Dict[int, Constructor],
+    completed_rounds: int = COMPLETED_ROUNDS,
+):
     """Derive form (last-5 avg), prices (from performance), and ownership."""
-    completed = list(range(1, COMPLETED_ROUNDS + 1))
+    completed = list(range(1, completed_rounds + 1))
     last5 = completed[-5:]
 
     # Form = average points over last 5 rounds, on a 0-10-ish scale.

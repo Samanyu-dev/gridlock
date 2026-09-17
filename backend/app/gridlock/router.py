@@ -6,7 +6,7 @@ provider), and serializes. No fantasy rules live here.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
@@ -128,6 +128,39 @@ def _constructor_brief(c) -> dict:
             for d in c.driver_ids
         ],
     }
+
+
+# --------------------------------------------------------------------------- #
+# Real leaderboard — built from registered users' actual saved teams. No demo
+# managers, no padded fields: an empty group of friends means an empty board.
+# --------------------------------------------------------------------------- #
+
+
+def _real_leaderboard_rows(session: Session) -> List[dict]:
+    rows = []
+    for t in session.exec(select(GLTeam)).all():
+        if not (t.driver_ids and t.constructor_ids):
+            continue
+        prof = session.get(GLProfile, t.profile_id)
+        if not prof:
+            continue
+        score = STORE.score_team(t.driver_ids, t.constructor_ids, t.captain_id)
+        rows.append({
+            "team_name": prof.team_name, "manager": f"@{prof.username}",
+            "country": prof.country, "total": score["total"],
+            "last_race": score["last_race_points"], "movement": 0,
+            "profile_id": prof.id,
+        })
+    rows.sort(key=lambda r: r["total"], reverse=True)
+    rank_with_ties(rows, "total")
+    return rows
+
+
+def _rank_and_field(rows: List[dict], total: float) -> Tuple[int, int]:
+    """(rank, field_size) for a points total against real rows that already
+    include this team (the row is saved before this is ever called)."""
+    rank = 1 + sum(1 for r in rows if r["total"] > total)
+    return rank, max(len(rows), rank)
 
 
 def _race_brief(r) -> dict:
@@ -335,7 +368,7 @@ def me(profile: GLProfile = Depends(get_current_user), session: Session = Depend
     result = {"profile": _serialize_profile(profile), "team": _serialize_team(team)}
     if team and team.driver_ids and team.constructor_ids:
         score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
-        rank, field_size = STORE.rank_for_total(score["total"])
+        rank, field_size = _rank_and_field(_real_leaderboard_rows(session), score["total"])
         result["score"] = score
         result["rank"] = rank
         result["field_size"] = field_size
@@ -374,7 +407,7 @@ def save_team(
     snapshots.build_snapshot(session, profile.id, deadlines.active_round(), state="provisional")
     team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile.id)).first()
     score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
-    rank, field_size = STORE.rank_for_total(score["total"])
+    rank, field_size = _rank_and_field(_real_leaderboard_rows(session), score["total"])
     return {
         "team": _serialize_team(team), "score": score, "rank": rank, "field_size": field_size,
         "transfers": outcome.as_dict(),
@@ -428,20 +461,14 @@ def leaderboard(
     p: Optional[GLProfile] = Depends(get_optional_user),
     session: Session = Depends(get_session),
 ):
-    managers = STORE.managers()
-    page = managers[offset: offset + limit]
-    me_row = None
-    if p:
-        team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
-        if team and team.driver_ids and team.constructor_ids:
-            score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
-            rank, field_size = STORE.rank_for_total(score["total"])
-            me_row = {
-                "rank": rank, "team_name": p.team_name, "manager": f"@{p.username}",
-                "country": p.country, "total": score["total"],
-                "last_race": score["last_race_points"], "movement": 0, "is_me": True,
-            }
-    return {"entries": page, "total": len(managers) + (1 if me_row else 0), "me": me_row}
+    """Real registered managers only — no demo padding. A quiet group shows a
+    quiet board; it fills in as friends actually build teams."""
+    rows = _real_leaderboard_rows(session)
+    for r in rows:
+        r["is_me"] = bool(p and r["profile_id"] == p.id)
+    page = rows[offset: offset + limit]
+    me_row = next((r for r in rows if r["is_me"]), None)
+    return {"entries": page, "total": len(rows), "me": me_row}
 
 
 @router.get("/leaderboard/round/{round_id}")
@@ -454,24 +481,29 @@ def round_leaderboard(
 ):
     """This-round-only ranking (RACE LEADERBOARD). LIVE while the round is in
     progress, PROVISIONAL once the session ends, FINAL once results are
-    reconciled — mirrors the state on the individual weekend ledger."""
-    page = STORE.round_leaderboard(offset, limit)
-    me_row = None
-    if p:
-        team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
-        if team and team.driver_ids and team.constructor_ids:
-            scored = snapshots.score_team_for_round(
-                team.driver_ids, team.constructor_ids, team.captain_id,
-                team.active_boost, team.boost_driver_id, team.boost_constructor_id, round_id,
-            )
-            me_row = {
-                "rank": STORE.rank_for_round(scored["total"]),
-                "team_name": p.team_name, "manager": f"@{p.username}", "country": p.country,
-                "total": scored["total"], "last_race": scored["total"], "movement": 0, "is_me": True,
-                "state": scored["state"],
-            }
-    total = len(STORE.managers()) + (1 if me_row else 0)
-    return {"round": round_id, "entries": page, "me": me_row, "total": total}
+    reconciled — mirrors the state on the individual weekend ledger. Real
+    registered managers only."""
+    rows = []
+    for t in session.exec(select(GLTeam)).all():
+        if not (t.driver_ids and t.constructor_ids):
+            continue
+        prof = session.get(GLProfile, t.profile_id)
+        if not prof:
+            continue
+        scored = snapshots.score_team_for_round(
+            t.driver_ids, t.constructor_ids, t.captain_id,
+            t.active_boost, t.boost_driver_id, t.boost_constructor_id, round_id,
+        )
+        rows.append({
+            "team_name": prof.team_name, "manager": f"@{prof.username}", "country": prof.country,
+            "total": scored["total"], "last_race": scored["total"], "movement": 0,
+            "state": scored["state"], "is_me": bool(p and prof.id == p.id),
+        })
+    rows.sort(key=lambda r: r["total"], reverse=True)
+    rank_with_ties(rows, "total")
+    page = rows[offset: offset + limit]
+    me_row = next((r for r in rows if r["is_me"]), None)
+    return {"round": round_id, "entries": page, "me": me_row, "total": len(rows)}
 
 
 # --------------------------------------------------------------------------- #
@@ -480,13 +512,9 @@ def round_leaderboard(
 
 
 @router.get("/leagues")
-def public_leagues(p: Optional[GLProfile] = Depends(get_optional_user), session: Session = Depends(get_session)):
-    out = []
-    for lg in STORE.public_leagues().values():
-        out.append({
-            "code": lg["code"], "name": lg["name"], "description": lg["description"],
-            "privacy": lg["privacy"], "type": lg["type"], "member_count": lg["member_count"],
-        })
+def my_leagues(p: Optional[GLProfile] = Depends(get_optional_user), session: Session = Depends(get_session)):
+    """Leagues are invite-only (create or join with a code) — there is no
+    public/browsable list, this is a private group of friends."""
     mine = []
     if p:
         memberships = session.exec(
@@ -497,9 +525,9 @@ def public_leagues(p: Optional[GLProfile] = Depends(get_optional_user), session:
             count = len(session.exec(select(GLLeagueMember).where(GLLeagueMember.league_id == lg.id)).all())
             mine.append({
                 "code": lg.code, "name": lg.name, "description": lg.description,
-                "privacy": lg.privacy, "type": lg.type, "member_count": count,
+                "type": lg.type, "member_count": count,
             })
-    return {"public": out, "mine": mine}
+    return {"mine": mine}
 
 
 @router.post("/leagues")
@@ -538,8 +566,7 @@ def join_league(
     if not code.startswith("GRID-"):
         code = "GRID-" + code
     lg = session.exec(select(GLLeague).where(GLLeague.code == code)).first()
-    is_demo = code in STORE.public_leagues()
-    if not lg and not is_demo:
+    if not lg:
         raise HTTPException(404, "No league with that code")
     if lg:
         existing = session.exec(
@@ -560,33 +587,6 @@ def league_detail(code: str, p: Optional[GLProfile] = Depends(get_optional_user)
         code = "GRID-" + code
 
     username = p.username if p else None
-    # Demo public league?
-    demo = STORE.public_leagues().get(code)
-    my_row = None
-    if p:
-        team = session.exec(select(GLTeam).where(GLTeam.profile_id == p.id)).first()
-        if team and team.driver_ids and team.constructor_ids:
-            sc = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
-            my_row = {
-                "team_name": p.team_name, "manager": f"@{p.username}",
-                "country": p.country, "total": sc["total"],
-                "last_race": sc["last_race_points"], "is_me": True,
-            }
-
-    if demo:
-        members = list(demo["members"])
-        if my_row:
-            members = members + [my_row]
-        members.sort(key=lambda m: m["total"], reverse=True)
-        rank_with_ties(members, "total")
-        for m in members:
-            m["league_rank"] = m.pop("rank")
-        return {
-            "code": demo["code"], "name": demo["name"], "description": demo["description"],
-            "privacy": demo["privacy"], "type": demo["type"], "creator": demo["creator"],
-            "member_count": len(members), "members": members,
-        }
-
     lg = session.exec(select(GLLeague).where(GLLeague.code == code)).first()
     if not lg:
         raise HTTPException(404, "League not found")
