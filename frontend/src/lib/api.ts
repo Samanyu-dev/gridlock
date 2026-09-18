@@ -1,7 +1,7 @@
 import type {
   Meta, Driver, DriverFull, Constructor, ConstructorFull, Race, RaceFull,
   MeResponse, Profile, TeamState, TeamScore, LeaderboardRow, LeagueSummary,
-  LeagueDetail, Insight, LiveSnapshot, SearchResult, Boost, WeekendScore,
+  LeagueDetail, Insight, LiveSnapshot, SearchResult, Boost, WeekendScore, OwnershipReport,
 } from './types'
 
 const TOKEN_KEY = 'gridlock.token'
@@ -98,6 +98,7 @@ export const api = {
   league: (code: string) => req<LeagueDetail>(`/leagues/${code}`),
 
   search: (q: string) => req<{ results: SearchResult[] }>(`/search${qs({ q })}`),
+  ownership: (league?: string) => req<OwnershipReport>(`/ownership${qs({ league })}`),
 
   dataHealth: () => req<DataHealth>('/admin/data-health'),
   resync: () => req<DataHealth>('/admin/resync', { method: 'POST' }),

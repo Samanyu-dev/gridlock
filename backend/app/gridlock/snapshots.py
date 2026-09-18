@@ -22,6 +22,33 @@ UNDERDOG_MULT = 2.0
 UNDERDOG_RANGE = (6, 10)
 
 
+def resolve_team(session: Session, profile_id: int, round_id: int) -> Optional[dict]:
+    """The team as it stood for a given round: the snapshot taken at that
+    round's deadline if one exists, else the profile's current live team (the
+    same fallback ``/team/score`` has always used for rounds nobody explicitly
+    re-saved) — one place other features (ownership, H2H, optimal-team) share
+    instead of re-deriving this lookup."""
+    snap = session.exec(
+        select(GLTeamSnapshot).where(
+            GLTeamSnapshot.profile_id == profile_id, GLTeamSnapshot.round_id == round_id,
+        )
+    ).first()
+    if snap:
+        return {
+            "driver_ids": snap.driver_ids, "constructor_ids": snap.constructor_ids,
+            "captain_id": snap.captain_id, "active_boost": snap.active_boost,
+            "boost_driver_id": snap.boost_driver_id,
+        }
+    team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile_id)).first()
+    if not team or not team.driver_ids:
+        return None
+    return {
+        "driver_ids": team.driver_ids, "constructor_ids": team.constructor_ids,
+        "captain_id": team.captain_id, "active_boost": team.active_boost,
+        "boost_driver_id": team.boost_driver_id,
+    }
+
+
 def _round_state(round_id: int) -> str:
     """Completed rounds are FINAL in the demo; the active round is LIVE until its
     deadline, then PROVISIONAL. A real deployment sets FINAL on official results."""

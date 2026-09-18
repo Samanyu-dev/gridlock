@@ -5,7 +5,7 @@ export interface Driver {
   country: string; country_name: string; image_url: string
   constructor: ConstructorRef
   price: number; price_prev: number; price_delta: number
-  points: number; form: number; ownership: number; status: string
+  points: number; form: number; ownership: number; captain_pct: number; underdog_pct: number; status: string
   value: number; last5: number[]
 }
 
@@ -94,6 +94,11 @@ export interface WeekendAsset {
 export interface WeekendScore {
   total: number; state: string; round: number; assets: WeekendAsset[]; from_snapshot?: boolean
   correction_notice?: string | null
+}
+export interface OwnershipRow { id: number; name: string; short: string; color: string; owned_pct: number; captain_pct?: number; underdog_pct?: number }
+export interface OwnershipReport {
+  round: number | null; total_teams: number; league: string | null
+  drivers: OwnershipRow[]; constructors: OwnershipRow[]
 }
 export interface TeamScore {
   total: number; drivers_points: number; constructors_points: number; captain_bonus: number
