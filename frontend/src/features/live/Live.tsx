@@ -7,7 +7,9 @@ import { StateBadge } from '../../components/ScoreBreakdown'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
 import { useSession } from '../../lib/session'
-import type { LeaderboardRow, LeagueDetail, Meta, MeResponse, RaceFull, WeekendScore } from '../../lib/types'
+import type { LeaderboardRow, LeagueDetail, Meta, MeResponse, OwnershipReport, RaceFull, WeekendScore } from '../../lib/types'
+
+const DIFFERENTIAL_THRESHOLD = 20
 
 export default function Live() {
   const { authed } = useSession()
@@ -17,6 +19,7 @@ export default function Live() {
   const [race, setRace] = useState<RaceFull | null>(null)
   const [round, setRound] = useState<LeaderboardRow[]>([])
   const [league, setLeague] = useState<LeagueDetail | null>(null)
+  const [ownership, setOwnership] = useState<OwnershipReport | null>(null)
   const [tab, setTab] = useState<'quali' | 'race'>('quali')
   const [showFull, setShowFull] = useState(false)
 
@@ -30,9 +33,22 @@ export default function Live() {
     }).catch(() => {})
     if (authed) {
       api.me().then(setMe).catch(() => {})
-      api.leagues().then((r) => { if (r.mine[0]) api.league(r.mine[0].code).then(setLeague).catch(() => {}) }).catch(() => {})
+      api.leagues().then((r) => {
+        if (r.mine[0]) {
+          api.league(r.mine[0].code).then(setLeague).catch(() => {})
+          api.ownership(r.mine[0].code).then(setOwnership).catch(() => {})
+        } else {
+          api.ownership().then(setOwnership).catch(() => {})
+        }
+      }).catch(() => {})
     }
   }, [authed])
+
+  const ownershipByRef = new Map<string, { owned_pct: number; captain_pct?: number }>()
+  if (ownership) {
+    for (const d of ownership.drivers) ownershipByRef.set(`driver:${d.id}`, d)
+    for (const c of ownership.constructors) ownershipByRef.set(`constructor:${c.id}`, c)
+  }
 
   if (!meta) return <div className="page container"><Skeleton h={80} /><div style={{ height: 16 }} /><Skeleton h={400} /></div>
 
@@ -108,6 +124,18 @@ export default function Live() {
                         <span style={{ fontWeight: 600, fontSize: 13 }}>{a.short || a.name}</span>
                         {a.ref === `driver:${captain}` && <span className="tag-pts tag-fl">2×</span>}
                         {a.ref === `driver:${underdog}` && <span className="tag-pts tag-gain">UNDERDOG</span>}
+                        {(() => {
+                          const o = ownershipByRef.get(a.ref)
+                          if (!o) return null
+                          if (a.ref === `driver:${captain}`) {
+                            const eo = Math.round((o.owned_pct + (o.captain_pct ?? 0)) * 10) / 10
+                            return <span className="eyebrow text-faint">Captain EO {eo}%</span>
+                          }
+                          if (o.owned_pct < DIFFERENTIAL_THRESHOLD) {
+                            return <span className="tag-pts" style={{ color: 'var(--info)', borderColor: 'var(--info)' }}>Differential · {o.owned_pct}% owned</span>
+                          }
+                          return null
+                        })()}
                       </span>
                       <span className="num" style={{ fontWeight: 700, color: a.subtotal >= 0 ? 'var(--text)' : 'var(--loss)' }}>{a.subtotal >= 0 ? '+' : ''}{a.subtotal}</span>
                     </div>
