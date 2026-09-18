@@ -14,7 +14,7 @@ from sqlmodel import Session, select
 from ..database import get_session
 from . import deadlines, snapshots, transfers
 from .auth import get_current_user, get_optional_user
-from .models import GLLeague, GLLeagueMember, GLProfile, GLTeam
+from .models import GLLeague, GLLeagueMember, GLProfile, GLTeam, GLTransfer
 from .provider import get_provider
 from .schemas import (
     CreateLeagueRequest,
@@ -138,6 +138,11 @@ def _constructor_brief(c) -> dict:
 
 
 def _real_leaderboard_rows(session: Session) -> List[dict]:
+    """Real rank movement, computed (not faked): compare each team's rank on
+    their current cumulative total against their rank before the last
+    completed round's points — same roster, same data, just one round back."""
+    s = STORE.season
+    last_round = s.next_round - 1
     rows = []
     for t in session.exec(select(GLTeam)).all():
         if not (t.driver_ids and t.constructor_ids):
@@ -146,14 +151,20 @@ def _real_leaderboard_rows(session: Session) -> List[dict]:
         if not prof:
             continue
         score = STORE.score_team(t.driver_ids, t.constructor_ids, t.captain_id)
+        prev_total = score["total"] - score["per_round"].get(last_round, 0)
         rows.append({
             "team_name": prof.team_name, "manager": f"@{prof.username}",
             "country": prof.country, "total": score["total"],
-            "last_race": score["last_race_points"], "movement": 0,
+            "last_race": score["last_race_points"], "prev_total": prev_total,
             "profile_id": prof.id,
         })
     rows.sort(key=lambda r: r["total"], reverse=True)
     rank_with_ties(rows, "total")
+    prev_order = sorted(rows, key=lambda r: r["prev_total"], reverse=True)
+    prev_rank = {id(r): i + 1 for i, r in enumerate(prev_order)}
+    for r in rows:
+        r["movement"] = prev_rank[id(r)] - r["rank"]
+        del r["prev_total"]
     return rows
 
 
@@ -200,6 +211,7 @@ def _race_full(r) -> dict:
 def meta():
     s = STORE.season
     nr = s.next_race
+    round_id = deadlines.active_round()
     return {
         "season": s.year,
         "product": "GRIDLOCK",
@@ -209,6 +221,9 @@ def meta():
         "next_race": _race_brief(nr) if nr else None,
         "config": scoring_config(),
         "team_name_suggestions": TEAM_NAME_SUGGESTIONS,
+        "round_id": round_id,
+        "locked": deadlines.is_locked(round_id),
+        "deadline": _iso(deadlines.deadline_for_round(round_id)) if deadlines.deadline_for_round(round_id) else None,
     }
 
 
@@ -450,6 +465,36 @@ def team_score(
     return scored
 
 
+@router.get("/team/transfers")
+def transfer_history(
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Every transfer this manager has ever made — a real, immutable audit
+    trail (GLTransfer rows), not a derived guess."""
+    s = STORE.season
+    rows = session.exec(
+        select(GLTransfer).where(GLTransfer.profile_id == profile.id).order_by(GLTransfer.created_at.desc())
+    ).all()
+
+    def _asset_name(kind: str, asset_id: Optional[int]) -> Optional[str]:
+        if asset_id is None:
+            return None
+        pool = s.drivers if kind == "driver" else s.constructors
+        a = pool.get(asset_id)
+        return a.name if a else None
+
+    out = []
+    for t in rows:
+        out.append({
+            "round": t.round_id, "asset_type": t.asset_type,
+            "sold": _asset_name(t.asset_type, t.sold_id), "bought": _asset_name(t.asset_type, t.bought_id),
+            "sale_price": t.sale_price, "purchase_price": t.purchase_price,
+            "free": t.free, "penalty": t.penalty, "created_at": _iso(t.created_at),
+        })
+    return {"transfers": out}
+
+
 # --------------------------------------------------------------------------- #
 # Leaderboard.
 # --------------------------------------------------------------------------- #
@@ -495,13 +540,22 @@ def round_leaderboard(
             t.driver_ids, t.constructor_ids, t.captain_id,
             t.active_boost, t.boost_driver_id, t.boost_constructor_id, round_id,
         )
+        prev = snapshots.score_team_for_round(
+            t.driver_ids, t.constructor_ids, t.captain_id,
+            t.active_boost, t.boost_driver_id, t.boost_constructor_id, round_id - 1,
+        ) if round_id > 1 else None
         rows.append({
             "team_name": prof.team_name, "manager": f"@{prof.username}", "country": prof.country,
-            "total": scored["total"], "last_race": scored["total"], "movement": 0,
+            "total": scored["total"], "last_race": scored["total"], "prev_total": prev["total"] if prev else 0,
             "state": scored["state"], "is_me": bool(p and prof.id == p.id),
         })
     rows.sort(key=lambda r: r["total"], reverse=True)
     rank_with_ties(rows, "total")
+    prev_order = sorted(rows, key=lambda r: r["prev_total"], reverse=True)
+    prev_rank = {id(r): i + 1 for i, r in enumerate(prev_order)}
+    for r in rows:
+        r["movement"] = prev_rank[id(r)] - r["rank"]
+        del r["prev_total"]
     page = rows[offset: offset + limit]
     me_row = next((r for r in rows if r["is_me"]), None)
     return {"round": round_id, "entries": page, "me": me_row, "total": len(rows)}
@@ -592,6 +646,7 @@ def league_detail(code: str, p: Optional[GLProfile] = Depends(get_optional_user)
     if not lg:
         raise HTTPException(404, "League not found")
     member_rows = session.exec(select(GLLeagueMember).where(GLLeagueMember.league_id == lg.id)).all()
+    last_round = STORE.season.next_round - 1
     members = []
     for mr in member_rows:
         prof = session.get(GLProfile, mr.profile_id)
@@ -600,18 +655,27 @@ def league_detail(code: str, p: Optional[GLProfile] = Depends(get_optional_user)
         team = session.exec(select(GLTeam).where(GLTeam.profile_id == prof.id)).first()
         total = 0
         last = 0
+        prev_total = 0
         if team and team.driver_ids and team.constructor_ids:
             sc = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
             total, last = sc["total"], sc["last_race_points"]
+            prev_total = total - sc["per_round"].get(last_round, 0)
         members.append({
             "team_name": prof.team_name, "manager": f"@{prof.username}",
-            "country": prof.country, "total": total, "last_race": last,
+            "country": prof.country, "total": total, "last_race": last, "prev_total": prev_total,
             "is_me": bool(username and prof.username == username),
         })
     members.sort(key=lambda m: m["total"], reverse=True)
     rank_with_ties(members, "total")
     for m in members:
         m["league_rank"] = m.pop("rank")
+    prev_order = sorted(members, key=lambda m: m["prev_total"], reverse=True)
+    prev_rank = {id(m): i + 1 for i, m in enumerate(prev_order)}
+    leader_total = members[0]["total"] if members else 0
+    for m in members:
+        m["movement"] = prev_rank[id(m)] - m["league_rank"]
+        m["gap_to_leader"] = leader_total - m["total"]
+        del m["prev_total"]
     return {
         "code": lg.code, "name": lg.name, "description": lg.description,
         "privacy": lg.privacy, "type": lg.type,

@@ -72,6 +72,7 @@ export interface GameConfig {
 export interface Meta {
   season: number; product: string; provider: string; next_round: number; total_rounds: number
   next_race: Race | null; config: GameConfig; team_name_suggestions: string[]
+  round_id: number; locked: boolean; deadline: string | null
 }
 
 export interface Profile {
@@ -106,6 +107,7 @@ export interface MeResponse {
 export interface LeaderboardRow {
   rank: number; team_name: string; manager: string; country: string | null
   total: number; last_race: number; movement: number; is_me?: boolean; league_rank?: number
+  gap_to_leader?: number
 }
 export interface LeagueSummary {
   code: string; name: string; description: string; privacy: string; type: string; member_count: number

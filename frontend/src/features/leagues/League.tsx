@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Copy, Check, Share2 } from 'lucide-react'
-import { Skeleton } from '../../components/bits'
+import { Delta, Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
 import type { LeagueDetail } from '../../lib/types'
@@ -50,14 +50,16 @@ export default function League() {
         <div className="panel" style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table className="tower">
-              <thead><tr><th>Rank</th><th>Team</th><th className="hide-mobile">Manager</th><th className="r hide-mobile">Last race</th><th className="r">Total</th></tr></thead>
+              <thead><tr><th>Rank</th><th></th><th>Team</th><th className="hide-mobile">Manager</th><th className="r hide-mobile">Last race</th><th className="r hide-mobile">Gap</th><th className="r">Total</th></tr></thead>
               <tbody>
                 {lg.members.map((m) => (
                   <tr key={m.manager + m.league_rank} style={{ background: m.is_me ? 'color-mix(in srgb, var(--red) 9%, transparent)' : undefined }}>
                     <td><span className={`pos pos-${m.league_rank}`}>{String(m.league_rank).padStart(2, '0')}</span></td>
+                    <td><Delta value={m.movement} /></td>
                     <td><span style={{ fontWeight: 600 }}>{flagEmoji(m.country)} {m.team_name}{m.is_me && <span className="tag-pts" style={{ background: 'var(--red-glow)', color: '#fff', marginLeft: 6 }}>YOU</span>}</span></td>
                     <td className="hide-mobile text-dim">{m.manager}</td>
                     <td className="r hide-mobile num text-dim">{m.last_race}</td>
+                    <td className="r hide-mobile num text-faint">{m.gap_to_leader ? `−${m.gap_to_leader.toLocaleString()}` : '—'}</td>
                     <td className="r num" style={{ fontWeight: 800, fontSize: 16 }}>{m.total.toLocaleString()}</td>
                   </tr>
                 ))}

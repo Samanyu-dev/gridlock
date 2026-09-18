@@ -83,6 +83,7 @@ export const api = {
     req<{ team: TeamState; score: TeamScore; rank: number; field_size: number; transfers: TransferOutcome }>(
       '/team', { method: 'PUT', body: JSON.stringify(payload) }),
   teamScore: (round?: number) => req<WeekendScore>(`/team/score${qs({ round_id: round })}`),
+  transferHistory: () => req<{ transfers: TransferRow[] }>('/team/transfers'),
 
   leaderboard: (p: { offset?: number; limit?: number } = {}) =>
     req<{ entries: LeaderboardRow[]; total: number; me: LeaderboardRow | null }>(`/leaderboard${qs(p)}`),
@@ -100,3 +101,8 @@ export const api = {
 }
 
 export interface TransferOutcome { transfers: number; free_used: number; penalized: number; penalty: number }
+export interface TransferRow {
+  round: number; asset_type: 'driver' | 'constructor'
+  sold: string | null; bought: string | null
+  sale_price: number; purchase_price: number; free: boolean; penalty: number; created_at: string
+}
