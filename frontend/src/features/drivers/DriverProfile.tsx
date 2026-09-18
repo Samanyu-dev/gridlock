@@ -63,6 +63,21 @@ export default function DriverProfile() {
           {/* Stats */}
           <div className="col gap-3">
             <div className="panel panel-pad">
+              <span className="section-title" style={{ fontSize: 16 }}>Form</span>
+              <div className="grid g2" style={{ marginTop: 12, gap: 8 }}>
+                {[
+                  ['Last 3 rds avg', d.stats.last3_avg_pts ?? '—'], ['Last 5 rds avg', d.stats.last5_avg_pts ?? '—'],
+                  ['Season avg', d.stats.season_avg_pts ?? '—'], ['Pts per $M', d.value],
+                  ['Quali avg pts', d.stats.quali_avg_pts ?? '—'], ['Race avg pts', d.stats.race_avg_pts ?? '—'],
+                  ['Consistency (σ)', d.stats.consistency], ['DNF rate', `${d.stats.dnf_rate}%`],
+                ].map(([k, v]) => (
+                  <div key={k as string} className="row between" style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                    <span className="text-dim" style={{ fontSize: 13 }}>{k}</span><span className="num" style={{ fontWeight: 700 }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="panel panel-pad">
               <span className="section-title" style={{ fontSize: 16 }}>Season stats</span>
               <div className="grid g2" style={{ marginTop: 12, gap: 8 }}>
                 {[['Avg qualifying', d.stats.avg_quali ?? '—'], ['Avg finish', d.stats.avg_finish ?? '—'], ['Podiums', d.stats.podiums], ['Wins', d.stats.wins], ['Pos. gained', d.stats.positions_gained], ['Fastest laps', d.stats.fastest_laps], ['DNFs', d.stats.dnfs], ['Races', d.stats.races]].map(([k, v]) => (

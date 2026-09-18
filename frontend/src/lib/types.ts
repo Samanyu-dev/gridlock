@@ -12,6 +12,9 @@ export interface Driver {
 export interface DriverStats {
   avg_quali: number | null; avg_finish: number | null; podiums: number
   wins: number; dnfs: number; fastest_laps: number; positions_gained: number; races: number
+  last3_avg_pts: number | null; last5_avg_pts: number | null; season_avg_pts: number | null
+  quali_avg_pts: number | null; race_avg_pts: number | null
+  consistency: number; dnf_rate: number
 }
 
 export interface DriverHistoryRow {

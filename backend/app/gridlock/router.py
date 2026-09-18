@@ -5,6 +5,7 @@ provider), and serializes. No fantasy rules live here.
 """
 from __future__ import annotations
 
+import statistics
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
@@ -82,11 +83,25 @@ def _driver_stats(d) -> dict:
     dnfs = sum(1 for r in d.results.values() if r["status"] == "dnf")
     fls = sum(1 for r in d.results.values() if r["fastest_lap"])
     gained = sum(max(0, r["grid"] - r["finish"]) for r in d.results.values() if r["finish"])
+    races = len(d.results)
+
+    def avg(xs: List[float]) -> Optional[float]:
+        return round(sum(xs) / len(xs), 1) if xs else None
+
+    completed = list(range(1, s.next_round))
+    season_pts = [d.round_points.get(r, 0) for r in completed]
+    quali_pts = [sum(i["points"] for i in d.round_breakdown.get(r, []) if i.get("phase") == "quali") for r in completed]
+    race_pts = [sum(i["points"] for i in d.round_breakdown.get(r, []) if i.get("phase") in ("race", "sprint")) for r in completed]
+
     return {
         "avg_quali": round(sum(qualis) / len(qualis), 1) if qualis else None,
         "avg_finish": round(sum(finishes) / len(finishes), 1) if finishes else None,
         "podiums": podiums, "wins": wins, "dnfs": dnfs, "fastest_laps": fls,
-        "positions_gained": gained, "races": len(d.results),
+        "positions_gained": gained, "races": races,
+        "last3_avg_pts": avg(season_pts[-3:]), "last5_avg_pts": avg(season_pts[-5:]),
+        "season_avg_pts": avg(season_pts), "quali_avg_pts": avg(quali_pts), "race_avg_pts": avg(race_pts),
+        "consistency": round(statistics.pstdev(season_pts), 1) if len(season_pts) > 1 else 0.0,
+        "dnf_rate": round(dnfs / races * 100, 1) if races else 0.0,
     }
 
 
