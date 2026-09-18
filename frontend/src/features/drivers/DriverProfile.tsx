@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Avatar, Sparkline, FormPill, Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
 import { flagEmoji, money, statusLabel } from '../../lib/format'
@@ -38,6 +38,18 @@ export default function DriverProfile() {
                 <div className="eyebrow">{k}</div><div className="num" style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>{v}</div>
               </div>
             ))}
+            <div className="grow" style={{ padding: 16, borderLeft: '1px solid var(--line)' }}>
+              <div className="eyebrow">Transfer trend</div>
+              <div className="row gap-1" style={{ marginTop: 4, alignItems: 'center' }}>
+                {d.transfer_trend.net > 0 && <TrendingUp size={18} color="var(--gain)" />}
+                {d.transfer_trend.net < 0 && <TrendingDown size={18} color="var(--loss)" />}
+                {d.transfer_trend.net === 0 && <Minus size={18} className="text-faint" />}
+                <span className="num" style={{ fontWeight: 800, fontSize: 22, color: d.transfer_trend.net > 0 ? 'var(--gain)' : d.transfer_trend.net < 0 ? 'var(--loss)' : undefined }}>
+                  {d.transfer_trend.net > 0 ? '+' : ''}{d.transfer_trend.net}
+                </span>
+              </div>
+              <span className="text-faint" style={{ fontSize: 11 }}>{d.transfer_trend.in} in · {d.transfer_trend.out} out</span>
+            </div>
           </div>
         </div>
 

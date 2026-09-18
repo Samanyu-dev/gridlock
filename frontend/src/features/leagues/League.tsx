@@ -50,7 +50,7 @@ export default function League() {
         <div className="panel" style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table className="tower">
-              <thead><tr><th>Rank</th><th></th><th>Team</th><th className="hide-mobile">Manager</th><th className="r hide-mobile">Last race</th><th className="r hide-mobile">Gap</th><th className="r">Total</th></tr></thead>
+              <thead><tr><th>Rank</th><th></th><th>Team</th><th className="hide-mobile">Manager</th><th className="r hide-mobile">Last race</th><th className="r hide-mobile">Gap</th><th className="r">Total</th><th></th></tr></thead>
               <tbody>
                 {lg.members.map((m) => (
                   <tr key={m.manager + m.league_rank} style={{ background: m.is_me ? 'color-mix(in srgb, var(--red) 9%, transparent)' : undefined }}>
@@ -61,6 +61,7 @@ export default function League() {
                     <td className="r hide-mobile num text-dim">{m.last_race}</td>
                     <td className="r hide-mobile num text-faint">{m.gap_to_leader ? `−${m.gap_to_leader.toLocaleString()}` : '—'}</td>
                     <td className="r num" style={{ fontWeight: 800, fontSize: 16 }}>{m.total.toLocaleString()}</td>
+                    <td className="r">{!m.is_me && <Link to={`/h2h/${m.manager.replace(/^@/, '')}`} className="btn btn-ghost btn-sm">Compare</Link>}</td>
                   </tr>
                 ))}
               </tbody>

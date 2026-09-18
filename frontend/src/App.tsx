@@ -25,6 +25,8 @@ import Rules from './features/rules/Rules'
 import Profile from './features/profile/Profile'
 import More from './features/profile/More'
 import Ownership from './features/ownership/Ownership'
+import H2H from './features/h2h/H2H'
+import TransferTrends from './features/transfers/TransferTrends'
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { authed } = useSession()
@@ -56,6 +58,8 @@ function AppRoutes() {
         <Route path="/leagues/:code" element={<RequireUser><League /></RequireUser>} />
         <Route path="/leaderboard" element={<RequireUser><Leaderboard /></RequireUser>} />
         <Route path="/ownership" element={<RequireUser><Ownership /></RequireUser>} />
+        <Route path="/h2h/:username" element={<RequireUser><H2H /></RequireUser>} />
+        <Route path="/transfers/trends" element={<RequireUser><TransferTrends /></RequireUser>} />
         <Route path="/rules" element={<RequireUser><Rules /></RequireUser>} />
         <Route path="/profile" element={<RequireUser><Profile /></RequireUser>} />
         <Route path="/more" element={<RequireUser><More /></RequireUser>} />

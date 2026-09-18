@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, X, Search, Info, Check, Lock, ArrowRight, AlertTriangle } from 'lucide-react'
+import { Plus, X, Search, Info, Check, Lock, ArrowRight, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react'
 import { Avatar, PriceDelta, FormPill } from '../../components/bits'
 import { CountUp, Countdown } from '../../components/motion'
 import { DriverDrawer } from './DriverDrawer'
@@ -307,7 +307,11 @@ export default function TeamBuilder() {
                           <Avatar name={d.name} number={d.number} color={d.constructor.color} size={38} image={d.image_url} />
                           <div className="col">
                             <span style={{ fontWeight: 600, fontSize: 14 }}>{d.name} <Info size={11} className="text-faint" /></span>
-                            <span className="eyebrow">{d.constructor.short} · {d.ownership}% owned</span>
+                            <span className="eyebrow row gap-1" style={{ alignItems: 'center' }}>
+                              {d.constructor.short} · {d.ownership}% owned
+                              {d.transfer_trend.net > 0 && <TrendingUp size={11} color="var(--gain)" />}
+                              {d.transfer_trend.net < 0 && <TrendingDown size={11} color="var(--loss)" />}
+                            </span>
                           </div>
                         </button>
                         <div className="row gap-3">
@@ -334,7 +338,14 @@ export default function TeamBuilder() {
                   const roomLeft = sel || (selConstructors.length < maxC && remaining - c.price >= -1e-6)
                   return (
                     <div key={c.id} className="row between race-edge" style={{ ['--accent' as string]: c.color, padding: '12px 12px 12px 16px', borderBottom: '1px solid var(--line-soft)', opacity: roomLeft ? 1 : 0.45 }}>
-                      <div className="col"><span style={{ fontWeight: 600 }}>{c.name}</span><span className="eyebrow">{c.points} pts · {c.reliability}% reliability · {c.ownership}% owned</span></div>
+                      <div className="col">
+                        <span style={{ fontWeight: 600 }}>{c.name}</span>
+                        <span className="eyebrow row gap-1" style={{ alignItems: 'center' }}>
+                          {c.points} pts · {c.reliability}% reliability · {c.ownership}% owned
+                          {c.transfer_trend.net > 0 && <TrendingUp size={11} color="var(--gain)" />}
+                          {c.transfer_trend.net < 0 && <TrendingDown size={11} color="var(--loss)" />}
+                        </span>
+                      </div>
                       <div className="row gap-3">
                         <div className="col" style={{ alignItems: 'flex-end' }}><span className="num" style={{ fontWeight: 700 }}>{money(c.price)}</span><PriceDelta value={c.price_delta} /></div>
                         <button className={`btn btn-sm ${sel ? 'btn-ghost' : 'btn-primary'}`} disabled={!roomLeft} onClick={() => toggleConstructor(c)} style={{ padding: 8 }}>

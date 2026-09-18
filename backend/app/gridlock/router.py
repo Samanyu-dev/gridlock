@@ -14,7 +14,10 @@ from sqlmodel import Session, select
 
 from ..database import get_session
 from . import deadlines, snapshots, transfers
+from . import h2h as h2h_mod
+from . import optimal_team as optimal_mod
 from . import ownership as ownership_mod
+from . import transfer_trends as trends_mod
 from .auth import get_current_user, get_optional_user, require_admin
 from .models import GLLeague, GLLeagueMember, GLLedgerAudit, GLProfile, GLTeam, GLTransfer, MDataSyncRun
 from .provider import get_provider
@@ -51,7 +54,13 @@ def _iso(dt: datetime) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def _driver_brief(d, omap: Optional[dict] = None) -> dict:
+def _transfer_trend_for(tmap: Optional[dict], bucket: str, asset_id: int) -> dict:
+    trend = tmap["trends"][bucket].get(asset_id, {"in": 0, "out": 0, "net": 0}) if tmap else {"in": 0, "out": 0, "net": 0}
+    ownership_delta = tmap["ownership_delta"][bucket].get(asset_id, 0.0) if tmap else 0.0
+    return {**trend, "ownership_delta": ownership_delta}
+
+
+def _driver_brief(d, omap: Optional[dict] = None, tmap: Optional[dict] = None) -> dict:
     s = STORE.season
     c = s.constructors[d.constructor_id]
     last5 = [d.round_points.get(r, 0) for r in range(max(1, s.next_round - 5), s.next_round)]
@@ -65,6 +74,7 @@ def _driver_brief(d, omap: Optional[dict] = None) -> dict:
             "accessible_color": c.accessible_color, "slug": c.slug,
         },
         "price": d.price, "price_prev": d.price_prev, "price_delta": round(d.price - d.price_prev, 1),
+        "transfer_trend": _transfer_trend_for(tmap, "drivers", d.id),
         "points": d.points, "form": d.form,
         "ownership": real["owned_pct"] if real else 0.0,
         "captain_pct": real["captain_pct"] if real else 0.0,
@@ -105,9 +115,9 @@ def _driver_stats(d) -> dict:
     }
 
 
-def _driver_full(d, omap: Optional[dict] = None) -> dict:
+def _driver_full(d, omap: Optional[dict] = None, tmap: Optional[dict] = None) -> dict:
     s = STORE.season
-    brief = _driver_brief(d, omap)
+    brief = _driver_brief(d, omap, tmap)
     history = []
     for rnd in range(1, s.next_round):
         r = d.results.get(rnd)
@@ -128,11 +138,11 @@ def _driver_full(d, omap: Optional[dict] = None) -> dict:
         "history": history,
         "price_history": d.price_history,
         "last_breakdown": d.round_breakdown.get(last_round, []),
-        "teammate": _driver_brief(teammate, omap) if teammate else None,
+        "teammate": _driver_brief(teammate, omap, tmap) if teammate else None,
     }
 
 
-def _constructor_brief(c, omap: Optional[dict] = None) -> dict:
+def _constructor_brief(c, omap: Optional[dict] = None, tmap: Optional[dict] = None) -> dict:
     s = STORE.season
     last5 = [c.round_points.get(r, 0) for r in range(max(1, s.next_round - 5), s.next_round)]
     real = omap["constructors"].get(c.id) if omap else None
@@ -142,6 +152,7 @@ def _constructor_brief(c, omap: Optional[dict] = None) -> dict:
         "price": c.price, "price_prev": c.price_prev, "price_delta": round(c.price - c.price_prev, 1),
         "points": c.points, "form": c.form, "ownership": real["owned_pct"] if real else 0.0,
         "reliability": round(c.reliability * 100), "last5": last5,
+        "transfer_trend": _transfer_trend_for(tmap, "constructors", c.id),
         "value": round(c.points / c.price, 1) if c.price else 0,
         "drivers": [
             {
@@ -150,6 +161,37 @@ def _constructor_brief(c, omap: Optional[dict] = None) -> dict:
             }
             for d in c.driver_ids
         ],
+    }
+
+
+def _constructor_stats(c) -> dict:
+    """Same form-stat treatment as drivers, but quali/race split and DNF
+    impact are aggregated across both cars — a constructor has no ledger
+    phase split of its own, only its drivers' contributions."""
+    s = STORE.season
+
+    def avg(xs: List[float]) -> Optional[float]:
+        return round(sum(xs) / len(xs), 1) if xs else None
+
+    completed = list(range(1, s.next_round))
+    season_pts = [c.round_points.get(r, 0) for r in completed]
+    car_drivers = [s.drivers[did] for did in c.driver_ids if did in s.drivers]
+    quali_pts = [
+        sum(sum(i["points"] for i in dr.round_breakdown.get(r, []) if i.get("phase") == "quali") for dr in car_drivers)
+        for r in completed
+    ]
+    race_pts = [
+        sum(sum(i["points"] for i in dr.round_breakdown.get(r, []) if i.get("phase") in ("race", "sprint")) for dr in car_drivers)
+        for r in completed
+    ]
+    dnf_count = sum(1 for dr in car_drivers for r in dr.results.values() if r["status"] == "dnf")
+    starts = sum(len(dr.results) for dr in car_drivers)
+
+    return {
+        "last3_avg_pts": avg(season_pts[-3:]), "last5_avg_pts": avg(season_pts[-5:]),
+        "season_avg_pts": avg(season_pts), "quali_avg_pts": avg(quali_pts), "race_avg_pts": avg(race_pts),
+        "consistency": round(statistics.pstdev(season_pts), 1) if len(season_pts) > 1 else 0.0,
+        "dnf_count": dnf_count, "dnf_rate": round(dnf_count / starts * 100, 1) if starts else 0.0,
     }
 
 
@@ -343,7 +385,8 @@ def drivers(
 ):
     s = STORE.season
     omap = ownership_mod.compute_ownership(session)
-    items = [_driver_brief(d, omap) for d in s.drivers.values()]
+    tmap = _transfer_map(session)
+    items = [_driver_brief(d, omap, tmap) for d in s.drivers.values()]
     if search:
         q = search.lower()
         items = [d for d in items if q in d["name"].lower() or q in d["short"].lower()]
@@ -365,14 +408,15 @@ def driver_detail(slug: str, session: Session = Depends(get_session)):
     d = next((x for x in s.drivers.values() if x.slug == slug), None)
     if not d:
         raise HTTPException(404, "Driver not found")
-    return _driver_full(d, ownership_mod.compute_ownership(session))
+    return _driver_full(d, ownership_mod.compute_ownership(session), _transfer_map(session))
 
 
 @router.get("/constructors")
 def constructors(sort: str = "points", order: str = "desc", session: Session = Depends(get_session)):
     s = STORE.season
     omap = ownership_mod.compute_ownership(session)
-    items = [_constructor_brief(c, omap) for c in s.constructors.values()]
+    tmap = _transfer_map(session)
+    items = [_constructor_brief(c, omap, tmap) for c in s.constructors.values()]
     keymap = {
         "points": lambda c: c["points"], "price": lambda c: c["price"],
         "form": lambda c: c["form"], "ownership": lambda c: c["ownership"],
@@ -389,13 +433,17 @@ def constructor_detail(slug: str, session: Session = Depends(get_session)):
     if not c:
         raise HTTPException(404, "Constructor not found")
     omap = ownership_mod.compute_ownership(session)
-    brief = _constructor_brief(c, omap)
+    tmap = _transfer_map(session)
+    brief = _constructor_brief(c, omap, tmap)
     history = [
         {"round": rnd, "points": c.round_points.get(rnd, 0)}
         for rnd in range(1, s.next_round)
     ]
-    drivers_full = [_driver_brief(s.drivers[d], omap) for d in c.driver_ids]
-    return {**brief, "history": history, "price_history": c.price_history, "drivers_full": drivers_full}
+    drivers_full = [_driver_brief(s.drivers[d], omap, tmap) for d in c.driver_ids]
+    return {
+        **brief, "history": history, "price_history": c.price_history, "drivers_full": drivers_full,
+        "stats": _constructor_stats(c),
+    }
 
 
 @router.get("/ownership")
@@ -436,6 +484,144 @@ def ownership_endpoint(
         "league": league_row.name if league_row else None,
         "drivers": drivers_out, "constructors": constructors_out,
     }
+
+
+def _transfer_map(session: Session) -> dict:
+    return {
+        "trends": trends_mod.compute_transfer_trends(session),
+        "ownership_delta": trends_mod.ownership_delta(session),
+    }
+
+
+@router.get("/transfers/trends")
+def transfer_trends_endpoint(
+    league: Optional[str] = None,
+    profile: Optional[GLProfile] = Depends(get_optional_user),
+    session: Session = Depends(get_session),
+):
+    """Most transferred in/out, net, and ownership change since the previous
+    lock — global or scoped to a league. Same service layer driver/constructor
+    pages and the transfer centre already read."""
+    profile_ids = None
+    league_row = None
+    if league:
+        league_row = session.exec(select(GLLeague).where(GLLeague.code == league)).first()
+        if not league_row:
+            raise HTTPException(404, "League not found")
+        member_ids = [
+            m.profile_id for m in
+            session.exec(select(GLLeagueMember).where(GLLeagueMember.league_id == league_row.id))
+        ]
+        if not profile or profile.id not in member_ids:
+            raise HTTPException(403, "You must be a member of this league to see its transfer trends.")
+        profile_ids = member_ids
+
+    trends = trends_mod.compute_transfer_trends(session, profile_ids=profile_ids)
+    odelta = trends_mod.ownership_delta(session, profile_ids=profile_ids)
+    s = STORE.season
+
+    def _rows(bucket: str, ref_fn) -> list:
+        out = []
+        for aid, t in trends[bucket].items():
+            ref = ref_fn(aid)
+            if not ref:
+                continue
+            out.append({**ref, **t, "ownership_delta": odelta[bucket].get(aid, 0.0)})
+        return out
+
+    drivers_out = _rows("drivers", _driver_ref)
+    constructors_out = _rows("constructors", _constructor_ref)
+    drivers_out.sort(key=lambda r: r["net"], reverse=True)
+    constructors_out.sort(key=lambda r: r["net"], reverse=True)
+    return {
+        "round": odelta["round"], "league": league_row.name if league_row else None,
+        "drivers": drivers_out, "constructors": constructors_out,
+    }
+
+
+def _driver_ref(did: Optional[int]) -> Optional[dict]:
+    s = STORE.season
+    d = s.drivers.get(did) if did is not None else None
+    if not d:
+        return None
+    return {"id": d.id, "name": d.name, "short": d.short, "color": s.constructors[d.constructor_id].color}
+
+
+def _constructor_ref(cid: Optional[int]) -> Optional[dict]:
+    s = STORE.season
+    c = s.constructors.get(cid) if cid is not None else None
+    if not c:
+        return None
+    return {"id": c.id, "name": c.name, "short": c.short, "color": c.color}
+
+
+def _find_rival(session: Session, username: str, exclude_profile_id: int) -> GLProfile:
+    other = session.exec(select(GLProfile).where(GLProfile.username == username.lstrip("@"))).first()
+    if not other:
+        raise HTTPException(404, "Manager not found")
+    if other.id == exclude_profile_id:
+        raise HTTPException(400, "Pick a rival, not yourself")
+    return other
+
+
+@router.get("/h2h/{username}")
+def h2h_endpoint(
+    username: str,
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    other = _find_rival(session, username, profile.id)
+    data = h2h_mod.compare_season(session, profile.id, other.id)
+    if not data:
+        raise HTTPException(404, "One of you doesn't have a team yet")
+
+    def _side(side: dict, who: GLProfile) -> dict:
+        return {
+            "profile_id": side["profile_id"], "username": who.username, "team_name": who.team_name,
+            "total": side["total"], "last_race_points": side["last_race_points"],
+            "captain": _driver_ref(side["captain_id"]),
+            "drivers": [_driver_ref(d) for d in side["driver_ids"]],
+            "constructors": [_constructor_ref(c) for c in side["constructor_ids"]],
+            "differentials": [_driver_ref(d) for d in side["differentials"]],
+        }
+
+    return {
+        "a": _side(data["a"], profile), "b": _side(data["b"], other),
+        "shared_drivers": [_driver_ref(d) for d in data["shared_drivers"]],
+        "shared_constructors": [_constructor_ref(c) for c in data["shared_constructors"]],
+        "gap": data["gap"], "rounds_record": data["rounds_record"],
+    }
+
+
+@router.get("/live/battle")
+def live_battle_endpoint(
+    rival: str,
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    other = _find_rival(session, rival, profile.id)
+    round_id = deadlines.active_round()
+    data = h2h_mod.live_battle(session, profile.id, other.id, round_id)
+    if not data:
+        raise HTTPException(404, "Battle not ready yet — it unlocks once this round's picks are locked in, or once both of you have a team.")
+    data["rival_username"] = other.username
+    data["rival_team_name"] = other.team_name
+    return data
+
+
+@router.get("/optimal-team/{round_id}")
+def optimal_team_endpoint(
+    round_id: int,
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Mathematically optimal $300M squad for a FINAL round vs the user's
+    actual result. Unavailable until the round is FINAL — there's nothing
+    honest to compare against while results are still provisional."""
+    data = optimal_mod.compare_to_actual(session, profile.id, round_id)
+    if not data:
+        raise HTTPException(404, "Not available — this round isn't FINAL yet, or doesn't exist.")
+    return data
 
 
 @router.get("/market")

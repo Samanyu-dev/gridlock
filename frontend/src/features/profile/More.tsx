@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { User, Building2, Flag, Trophy, BookOpen, BarChart3, Repeat, Activity, Sun, Moon, LogOut, ChevronRight, Users } from 'lucide-react'
+import { User, Building2, Flag, Trophy, BookOpen, BarChart3, Repeat, Activity, Sun, Moon, LogOut, ChevronRight, Users, ArrowLeftRight } from 'lucide-react'
 import { useSession } from '../../lib/session'
 
 const LINKS = [
@@ -8,6 +8,7 @@ const LINKS = [
   { to: '/races', label: 'Race calendar', icon: Flag },
   { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   { to: '/ownership', label: 'Ownership', icon: Users },
+  { to: '/transfers/trends', label: 'Transfer trends', icon: ArrowLeftRight },
   { to: '/team/transfers', label: 'Transfer history', icon: Repeat },
   { to: '/rules', label: 'How to play', icon: BookOpen },
   { to: '/profile', label: 'Profile & achievements', icon: BarChart3 },

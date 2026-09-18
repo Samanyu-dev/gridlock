@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Avatar, Sparkline, Skeleton } from '../../components/bits'
 import { api } from '../../lib/api'
 import { money } from '../../lib/format'
@@ -30,6 +30,18 @@ export default function ConstructorProfile() {
                 <div className="eyebrow">{k}</div><div className="num" style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>{v}</div>
               </div>
             ))}
+            <div className="grow" style={{ padding: 16, borderLeft: '1px solid var(--line)' }}>
+              <div className="eyebrow">Transfer trend</div>
+              <div className="row gap-1" style={{ marginTop: 4, alignItems: 'center' }}>
+                {c.transfer_trend.net > 0 && <TrendingUp size={18} color="var(--gain)" />}
+                {c.transfer_trend.net < 0 && <TrendingDown size={18} color="var(--loss)" />}
+                {c.transfer_trend.net === 0 && <Minus size={18} className="text-faint" />}
+                <span className="num" style={{ fontWeight: 800, fontSize: 22, color: c.transfer_trend.net > 0 ? 'var(--gain)' : c.transfer_trend.net < 0 ? 'var(--loss)' : undefined }}>
+                  {c.transfer_trend.net > 0 ? '+' : ''}{c.transfer_trend.net}
+                </span>
+              </div>
+              <span className="text-faint" style={{ fontSize: 11 }}>{c.transfer_trend.in} in · {c.transfer_trend.out} out</span>
+            </div>
           </div>
         </div>
 
@@ -40,6 +52,22 @@ export default function ConstructorProfile() {
               <span className="num" style={{ fontWeight: 800, fontSize: 20 }}>{d.points}</span>
             </Link>
           ))}
+        </div>
+
+        <div className="panel panel-pad" style={{ marginBottom: 20 }}>
+          <span className="section-title" style={{ fontSize: 16 }}>Form</span>
+          <div className="grid g2" style={{ marginTop: 12, gap: 8 }}>
+            {[
+              ['Last 3 rds avg', c.stats.last3_avg_pts ?? '—'], ['Last 5 rds avg', c.stats.last5_avg_pts ?? '—'],
+              ['Season avg', c.stats.season_avg_pts ?? '—'], ['Pts per $M', c.value],
+              ['Quali avg pts', c.stats.quali_avg_pts ?? '—'], ['Race avg pts', c.stats.race_avg_pts ?? '—'],
+              ['Consistency (σ)', c.stats.consistency], ['DNF rate (both cars)', `${c.stats.dnf_rate}%`],
+            ].map(([k, v]) => (
+              <div key={k as string} className="row between" style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                <span className="text-dim" style={{ fontSize: 13 }}>{k}</span><span className="num" style={{ fontWeight: 700 }}>{v}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="panel panel-pad">

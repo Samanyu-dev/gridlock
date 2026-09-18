@@ -1,4 +1,5 @@
 export interface ConstructorRef { id: number; name: string; short: string; color: string; accessible_color: string; slug: string }
+export interface TransferTrend { in: number; out: number; net: number; ownership_delta: number }
 
 export interface Driver {
   id: number; name: string; short: string; number: number; slug: string
@@ -6,7 +7,7 @@ export interface Driver {
   constructor: ConstructorRef
   price: number; price_prev: number; price_delta: number
   points: number; form: number; ownership: number; captain_pct: number; underdog_pct: number; status: string
-  value: number; last5: number[]
+  value: number; last5: number[]; transfer_trend: TransferTrend
 }
 
 export interface DriverStats {
@@ -35,12 +36,18 @@ export interface Constructor {
   accessible_color: string; logo_url: string; car_url: string
   price: number; price_prev: number; price_delta: number
   points: number; form: number; ownership: number; reliability: number
-  last5: number[]; value: number
+  last5: number[]; value: number; transfer_trend: TransferTrend
   drivers: { id: number; name: string; short: string; number: number; image_url: string }[]
+}
+export interface ConstructorStats {
+  last3_avg_pts: number | null; last5_avg_pts: number | null; season_avg_pts: number | null
+  quali_avg_pts: number | null; race_avg_pts: number | null
+  consistency: number; dnf_count: number; dnf_rate: number
 }
 export interface ConstructorFull extends Constructor {
   history: { round: number; points: number }[]
   drivers_full: Driver[]
+  stats: ConstructorStats
 }
 
 export interface RaceSession { kind: string; label: string; start: string }
@@ -137,3 +144,38 @@ export interface LiveSnapshot {
   reason?: string
 }
 export interface SearchResult { type: string; label: string; slug: string; meta: string }
+
+export interface H2HRef { id: number; name: string; short: string; color: string }
+export interface H2HSide {
+  profile_id: number; username: string; team_name: string; total: number; last_race_points: number
+  captain: H2HRef | null; drivers: H2HRef[]; constructors: H2HRef[]; differentials: H2HRef[]
+}
+export interface H2HReport {
+  a: H2HSide; b: H2HSide; shared_drivers: H2HRef[]; shared_constructors: H2HRef[]
+  gap: number; rounds_record: { a: number; b: number; ties: number }
+}
+
+export interface LiveBattleSwing { ref: string; name: string; short: string; color: string; mine: number; rival: number; delta: number }
+export interface LiveBattleAsset { ref: string; name: string; short: string; color: string; subtotal: number }
+export interface LiveBattleReport {
+  round: number; state: string
+  mine: { total: number; season_before: number }; rival: { total: number; season_before: number }
+  swing: number; gap_before: number; gap_projected: number
+  swings: LiveBattleSwing[]
+  captain_battle: { mine: LiveBattleAsset | null; rival: LiveBattleAsset | null }
+  rival_username: string; rival_team_name: string
+}
+
+export interface TransferTrendRow { id: number; name: string; short: string; color: string; in: number; out: number; net: number; ownership_delta: number }
+export interface TransferTrendsReport {
+  round: number | null; league: string | null
+  drivers: TransferTrendRow[]; constructors: TransferTrendRow[]
+}
+
+export interface OptimalMissedRow { ref: string; name: string; short: string; color: string; optimal: number; mine: number; missed: number }
+export interface OptimalTeamReport {
+  round: number; actual_total: number; optimal_total: number; efficiency: number; missed_points: number
+  optimal_assets: WeekendAsset[]; actual_assets: WeekendAsset[]
+  optimal_captain_id: number; optimal_underdog_id: number | null
+  breakdown: OptimalMissedRow[]
+}

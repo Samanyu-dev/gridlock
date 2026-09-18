@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, Radio, Users } from 'lucide-react'
+import { ChevronDown, Radio, Users, Swords } from 'lucide-react'
 import { Countdown } from '../../components/motion'
 import { Skeleton } from '../../components/bits'
 import { StateBadge } from '../../components/ScoreBreakdown'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
 import { useSession } from '../../lib/session'
-import type { LeaderboardRow, LeagueDetail, Meta, MeResponse, OwnershipReport, RaceFull, WeekendScore } from '../../lib/types'
+import type { LeaderboardRow, LeagueDetail, LiveBattleReport, Meta, MeResponse, OptimalTeamReport, OwnershipReport, RaceFull, WeekendScore } from '../../lib/types'
 
 const DIFFERENTIAL_THRESHOLD = 20
 
@@ -22,6 +22,10 @@ export default function Live() {
   const [ownership, setOwnership] = useState<OwnershipReport | null>(null)
   const [tab, setTab] = useState<'quali' | 'race'>('quali')
   const [showFull, setShowFull] = useState(false)
+  const [rival, setRival] = useState('')
+  const [battle, setBattle] = useState<LiveBattleReport | null>(null)
+  const [battleErr, setBattleErr] = useState('')
+  const [optimal, setOptimal] = useState<OptimalTeamReport | null>(null)
 
   useEffect(() => {
     api.meta().then((m) => {
@@ -43,6 +47,17 @@ export default function Live() {
       }).catch(() => {})
     }
   }, [authed])
+
+  useEffect(() => {
+    if (!rival) { setBattle(null); setBattleErr(''); return }
+    setBattle(null); setBattleErr('')
+    api.liveBattle(rival).then(setBattle).catch((e) => setBattleErr(e.message))
+  }, [rival])
+
+  useEffect(() => {
+    if (!authed || !meta?.next_race || meta.next_race.round_state !== 'FINAL') { setOptimal(null); return }
+    api.optimalTeam(meta.next_race.round).then(setOptimal).catch(() => setOptimal(null))
+  }, [authed, meta])
 
   const ownershipByRef = new Map<string, { owned_pct: number; captain_pct?: number }>()
   if (ownership) {
@@ -144,6 +159,38 @@ export default function Live() {
               </div>
             )}
 
+            {/* Optimal Team / Missed Points Analysis — only once the round is FINAL */}
+            {optimal && (
+              <div className="panel panel-pad">
+                <span className="section-title" style={{ fontSize: 16 }}>Optimal team analysis</span>
+                <div className="grid g3" style={{ marginTop: 12, gap: 8 }}>
+                  <div className="col" style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                    <span className="eyebrow">Your score</span><span className="num" style={{ fontWeight: 800, fontSize: 20 }}>{optimal.actual_total}</span>
+                  </div>
+                  <div className="col" style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                    <span className="eyebrow">Optimal</span><span className="num" style={{ fontWeight: 800, fontSize: 20 }}>{optimal.optimal_total}</span>
+                  </div>
+                  <div className="col" style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
+                    <span className="eyebrow">Efficiency</span>
+                    <span className="num" style={{ fontWeight: 800, fontSize: 20, color: optimal.efficiency >= 80 ? 'var(--gain)' : optimal.efficiency >= 50 ? 'var(--caution)' : 'var(--loss)' }}>{optimal.efficiency}%</span>
+                  </div>
+                </div>
+                {optimal.breakdown.length > 0 && (
+                  <>
+                    <p className="text-faint" style={{ fontSize: 12, margin: '14px 0 8px' }}>Where points were left behind ({optimal.missed_points} total missed)</p>
+                    <div className="col gap-1">
+                      {optimal.breakdown.slice(0, 6).map((row) => (
+                        <div key={row.ref} className="row between" style={{ padding: '5px 0', fontSize: 13 }}>
+                          <span className="row gap-2"><span className="team-dot" style={{ background: row.color }} />{row.short || row.name}</span>
+                          <span className="num text-dim">{row.mine} → <span style={{ color: 'var(--gain)', fontWeight: 700 }}>{row.optimal}</span></span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Session tabs: qualifying / race classification */}
             {race && (
               <div className="panel" style={{ overflow: 'hidden' }}>
@@ -227,6 +274,51 @@ export default function Live() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Live League Battle */}
+            {league && league.members.filter((m) => !m.is_me).length > 0 && (
+              <div className="panel panel-pad">
+                <div className="row between" style={{ marginBottom: 10 }}>
+                  <span className="section-title" style={{ fontSize: 15 }}><Swords size={14} style={{ verticalAlign: -2 }} /> Live battle</span>
+                  <select className="select" style={{ width: 'auto', fontSize: 12 }} value={rival} onChange={(e) => setRival(e.target.value)}>
+                    <option value="">Pick a rival…</option>
+                    {league.members.filter((m) => !m.is_me).map((m) => (
+                      <option key={m.manager} value={m.manager.replace(/^@/, '')}>{m.team_name}</option>
+                    ))}
+                  </select>
+                </div>
+                {battleErr && <p className="text-faint" style={{ fontSize: 13 }}>{battleErr}</p>}
+                {rival && !battle && !battleErr && <Skeleton h={100} />}
+                {battle && (
+                  <>
+                    <div className="row between" style={{ padding: '8px 0' }}>
+                      <div className="col"><span className="eyebrow">You</span><span className="num" style={{ fontWeight: 800, fontSize: 22, color: 'var(--gain)' }}>+{battle.mine.total}</span></div>
+                      <span className="chip" style={{ alignSelf: 'center', color: battle.swing >= 0 ? 'var(--gain)' : 'var(--loss)', borderColor: battle.swing >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                        {battle.swing >= 0 ? '+' : ''}{battle.swing} swing
+                      </span>
+                      <div className="col" style={{ alignItems: 'flex-end' }}><span className="eyebrow">{battle.rival_team_name}</span><span className="num" style={{ fontWeight: 800, fontSize: 22 }}>+{battle.rival.total}</span></div>
+                    </div>
+                    <p className="text-faint" style={{ fontSize: 12, margin: '4px 0 10px' }}>
+                      Projected gap after this round: {battle.gap_projected >= 0 ? '+' : ''}{battle.gap_projected} (was {battle.gap_before >= 0 ? '+' : ''}{battle.gap_before})
+                    </p>
+                    {battle.captain_battle.mine && battle.captain_battle.rival && (
+                      <div className="row between" style={{ padding: '6px 0', borderTop: '1px solid var(--line-soft)', fontSize: 13 }}>
+                        <span className="text-dim">Captain battle</span>
+                        <span>{battle.captain_battle.mine.short} {battle.captain_battle.mine.subtotal} vs {battle.captain_battle.rival.subtotal} {battle.captain_battle.rival.short}</span>
+                      </div>
+                    )}
+                    <div className="col gap-1" style={{ marginTop: 8 }}>
+                      {battle.swings.slice(0, 6).map((sw) => (
+                        <div key={sw.ref} className="row between" style={{ padding: '5px 0', fontSize: 13 }}>
+                          <span className="row gap-2"><span className="team-dot" style={{ background: sw.color }} />{sw.short || sw.name}</span>
+                          <span className="num" style={{ fontWeight: 700, color: sw.delta >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{sw.delta >= 0 ? '+' : ''}{sw.delta}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
