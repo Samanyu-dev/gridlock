@@ -82,7 +82,7 @@ def _driver_stats(d) -> dict:
     wins = sum(1 for f in finishes if f == 1)
     dnfs = sum(1 for r in d.results.values() if r["status"] == "dnf")
     fls = sum(1 for r in d.results.values() if r["fastest_lap"])
-    gained = sum(max(0, r["grid"] - r["finish"]) for r in d.results.values() if r["finish"])
+    gained = sum(max(0, r["grid"] - r["finish"]) for r in d.results.values() if r["finish"] and r["grid"])
     races = len(d.results)
 
     def avg(xs: List[float]) -> Optional[float]:
