@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { RefreshCw, AlertTriangle, CheckCircle2, History } from 'lucide-react'
 import { Skeleton } from '../../components/bits'
-import { api, type DataHealth as DataHealthType } from '../../lib/api'
+import { api, type DataHealth as DataHealthType, type LedgerAuditGroup } from '../../lib/api'
 import { useSession } from '../../lib/session'
 
 const STATE_COLOR: Record<string, string> = {
@@ -12,10 +12,14 @@ const STATE_COLOR: Record<string, string> = {
 export default function DataHealth() {
   const { profile } = useSession()
   const [health, setHealth] = useState<DataHealthType | null>(null)
+  const [audit, setAudit] = useState<LedgerAuditGroup[] | null>(null)
   const [err, setErr] = useState('')
   const [syncing, setSyncing] = useState(false)
 
-  useEffect(() => { api.dataHealth().then(setHealth).catch((e) => setErr(e.message)) }, [])
+  useEffect(() => {
+    api.dataHealth().then(setHealth).catch((e) => setErr(e.message))
+    api.ledgerAudit().then((r) => setAudit(r.groups)).catch(() => setAudit([]))
+  }, [])
 
   const resync = async () => {
     setSyncing(true)
@@ -89,6 +93,33 @@ export default function DataHealth() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="panel panel-pad" style={{ marginTop: 20 }}>
+          <span className="section-title" style={{ fontSize: 16, display: 'block', marginBottom: 12 }}><History size={16} style={{ verticalAlign: -2 }} /> Ledger corrections</span>
+          {audit && audit.length === 0 && <p className="text-dim" style={{ fontSize: 13 }}>No corrections have ever been detected — every resync has matched the persisted baseline.</p>}
+          {audit && audit.length > 0 && (
+            <div className="col gap-3">
+              {audit.map((g) => (
+                <div key={g.run_id ?? 'unknown'} className="panel" style={{ background: 'var(--surface-2)', padding: 12 }}>
+                  <div className="row between" style={{ marginBottom: 8 }}>
+                    <span className="eyebrow">Sync #{g.run_id ?? '—'}</span>
+                    <span className="text-faint" style={{ fontSize: 12 }}>{g.run_started_at ? new Date(g.run_started_at).toLocaleString() : '—'}</span>
+                  </div>
+                  <div className="col gap-1">
+                    {g.corrections.map((c) => (
+                      <div key={c.id} className="row between" style={{ padding: '6px 0', fontSize: 13 }}>
+                        <span>{c.entity_name} · Round {c.round} <span className="text-faint">({c.reason.replace('_', ' ')})</span></span>
+                        <span className="num" style={{ fontWeight: 700 }}>
+                          {c.previous_points} → {c.new_points} <span style={{ color: c.delta >= 0 ? 'var(--gain)' : 'var(--loss)' }}>({c.delta >= 0 ? '+' : ''}{c.delta})</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

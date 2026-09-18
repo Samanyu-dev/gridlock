@@ -14,7 +14,7 @@ from sqlmodel import Session, select
 from ..database import get_session
 from . import deadlines, snapshots, transfers
 from .auth import get_current_user, get_optional_user, require_admin
-from .models import GLLeague, GLLeagueMember, GLProfile, GLTeam, GLTransfer
+from .models import GLLeague, GLLeagueMember, GLLedgerAudit, GLProfile, GLTeam, GLTransfer, MDataSyncRun
 from .provider import get_provider
 from .schemas import (
     CreateLeagueRequest,
@@ -263,6 +263,44 @@ def resync(_: object = Depends(require_admin)):
     return get_provider().health()
 
 
+@router.get("/admin/ledger-audit")
+def ledger_audit(
+    limit: int = Query(default=100, le=500),
+    _: object = Depends(require_admin),
+    session: Session = Depends(get_session),
+):
+    """Every correction the scoring pipeline has ever detected, grouped by
+    the sync run that found it — "why did my score change from X to Y"."""
+    s = STORE.season
+    rows = session.exec(
+        select(GLLedgerAudit).order_by(GLLedgerAudit.detected_at.desc()).limit(limit)
+    ).all()
+    run_ids = {r.run_id for r in rows if r.run_id is not None}
+    runs = {r.id: r for r in session.exec(select(MDataSyncRun).where(MDataSyncRun.id.in_(run_ids))).all()} if run_ids else {}
+
+    def _entity_name(kind: str, eid: int) -> str:
+        pool = s.drivers if kind == "driver" else s.constructors
+        a = pool.get(eid)
+        return a.name if a else f"{kind} #{eid}"
+
+    entries = []
+    for r in rows:
+        run = runs.get(r.run_id)
+        entries.append({
+            "id": r.id, "round": r.round_id, "entity_type": r.entity_type, "entity_id": r.entity_id,
+            "entity_name": _entity_name(r.entity_type, r.entity_id),
+            "previous_points": r.previous_points, "new_points": r.new_points, "delta": r.delta,
+            "reason": r.reason, "detected_at": _iso(r.detected_at),
+            "run_id": r.run_id, "run_started_at": _iso(run.started_at) if run else None,
+        })
+    # Group by run for the admin page's "corrections by sync" view.
+    by_run: dict = {}
+    for e in entries:
+        by_run.setdefault(e["run_id"], []).append(e)
+    groups = [{"run_id": rid, "run_started_at": items[0]["run_started_at"], "corrections": items} for rid, items in by_run.items()]
+    return {"total": len(entries), "groups": groups}
+
+
 @router.get("/insights")
 def insights():
     return {"insights": STORE.insights()}
@@ -485,6 +523,7 @@ def team_score(
             snap.active_boost, snap.boost_driver_id, snap.boost_constructor_id, rid,
         )
         scored["from_snapshot"] = True
+        scored["correction_notice"] = _correction_notice(session, rid, snap.driver_ids, snap.constructor_ids)
         return scored
     team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile.id)).first()
     if not team or not team.driver_ids:
@@ -494,7 +533,23 @@ def team_score(
         team.active_boost, team.boost_driver_id, team.boost_constructor_id, rid,
     )
     scored["from_snapshot"] = False
+    scored["correction_notice"] = _correction_notice(session, rid, team.driver_ids, team.constructor_ids)
     return scored
+
+
+def _correction_notice(session: Session, round_id: int, driver_ids: List[int], constructor_ids: List[int]) -> Optional[str]:
+    """"Points adjusted after official result update" — only when a real,
+    persisted correction touched one of this team's assets for this round."""
+    hit = session.exec(
+        select(GLLedgerAudit).where(
+            GLLedgerAudit.round_id == round_id,
+            ((GLLedgerAudit.entity_type == "driver") & (GLLedgerAudit.entity_id.in_(driver_ids)))
+            | ((GLLedgerAudit.entity_type == "constructor") & (GLLedgerAudit.entity_id.in_(constructor_ids))),
+        ).order_by(GLLedgerAudit.detected_at.desc())
+    ).first()
+    if not hit:
+        return None
+    return "Points adjusted after an official result update."
 
 
 @router.get("/team/transfers")

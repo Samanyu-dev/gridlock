@@ -106,6 +106,7 @@ class OpenF1Provider(MotorsportDataProvider):
         self.last_sync_duration: Optional[float] = None
         self.last_sync_source: str = "none"  # "openf1" or "fallback"
         self.sync_count: int = 0
+        self.last_reconciled_changes: int = 0
 
     def get_season(self, force: bool = False) -> Season:
         stale = (
@@ -121,8 +122,13 @@ class OpenF1Provider(MotorsportDataProvider):
     def _sync(self) -> None:
         """One deterministic recompute from whatever OpenF1 reports right
         now. Never patches individual points — a full, reproducible rebuild
-        is the only way results ever change here."""
+        is the only way results ever change here. Reconciliation (persisting
+        the ledger baseline + auditing any real change) happens after, and
+        can never fail the sync itself."""
+        from .reconciliation import finish_run, reconcile, start_run
         t0 = time.monotonic()
+        run_id = start_run(self.name)
+        changes = 0
         try:
             from .normalize import normalize_season
             season = normalize_season(self.client, self.year)
@@ -131,13 +137,17 @@ class OpenF1Provider(MotorsportDataProvider):
             self._season = season
             self.last_error = None
             self.last_sync_source = "openf1"
+            changes = reconcile(season, run_id)
+            finish_run(run_id, "ok", changes)
         except Exception as exc:  # defensive: never crash the app on a data issue
             self.last_error = str(exc)
+            finish_run(run_id, "failed", 0, error=str(exc))
             if self._season is None:
                 self._season = build_season()  # seeded fallback keeps the app alive
                 self.last_sync_source = "fallback"
         self.last_sync_duration = round(time.monotonic() - t0, 2)
         self.last_synced_at = datetime.now(UTC)
+        self.last_reconciled_changes = changes
         self.sync_count += 1
 
     def health(self) -> dict:
@@ -159,4 +169,5 @@ class OpenF1Provider(MotorsportDataProvider):
             "rounds_with_confirmed_winner": rounds_with_winner,
             "rounds_total": rounds_total,
             "data_gaps": rounds_elapsed - rounds_with_winner,
+            "last_reconciled_changes": self.last_reconciled_changes,
         }

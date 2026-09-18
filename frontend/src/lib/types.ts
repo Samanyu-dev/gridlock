@@ -93,6 +93,7 @@ export interface WeekendAsset {
 }
 export interface WeekendScore {
   total: number; state: string; round: number; assets: WeekendAsset[]; from_snapshot?: boolean
+  correction_notice?: string | null
 }
 export interface TeamScore {
   total: number; drivers_points: number; constructors_points: number; captain_bonus: number

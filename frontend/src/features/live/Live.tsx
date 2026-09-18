@@ -77,6 +77,11 @@ export default function Live() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 16 }} className="live-grid">
           <div className="col gap-3">
+            {weekend?.correction_notice && (
+              <div className="panel panel-pad" style={{ borderColor: 'var(--caution)', color: 'var(--caution)', fontSize: 13 }}>
+                {weekend.correction_notice}
+              </div>
+            )}
             {/* Your performance */}
             {me?.score ? (
               <div className="grid g4">

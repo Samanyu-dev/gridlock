@@ -101,9 +101,16 @@ export const api = {
 
   dataHealth: () => req<DataHealth>('/admin/data-health'),
   resync: () => req<DataHealth>('/admin/resync', { method: 'POST' }),
+  ledgerAudit: () => req<{ total: number; groups: LedgerAuditGroup[] }>('/admin/ledger-audit'),
 }
 
 export interface TransferOutcome { transfers: number; free_used: number; penalized: number; penalty: number }
+export interface LedgerCorrection {
+  id: number; round: number; entity_type: string; entity_id: number; entity_name: string
+  previous_points: number; new_points: number; delta: number; reason: string
+  detected_at: string; run_id: number | null; run_started_at: string | null
+}
+export interface LedgerAuditGroup { run_id: number | null; run_started_at: string | null; corrections: LedgerCorrection[] }
 export interface DataHealth {
   provider: string; season_year?: number
   last_synced_at: string | null; last_sync_duration_seconds: number | null

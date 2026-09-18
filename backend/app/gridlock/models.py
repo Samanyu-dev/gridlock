@@ -328,3 +328,44 @@ class MDataSyncRun(SQLModel, table=True):
     status: str = "running"   # running/ok/failed
     records: int = 0
     error: Optional[str] = None
+
+
+# =========================================================================== #
+# Persistent ledger reconciliation — the durable baseline + audit trail behind
+# "why did my score change". GLLedgerState is the last-known-good fantasy
+# ledger per (round, entity); GLLedgerAudit is an append-only log of every
+# time a resync found that baseline had actually changed. Nothing here ever
+# recomputes points itself — it only observes what the scoring engine (fed by
+# real provider data) already produced and records real transitions.
+# =========================================================================== #
+
+class GLLedgerState(SQLModel, table=True):
+    __tablename__ = "gl_ledger_state"
+    __table_args__ = (UniqueConstraint("round_id", "entity_type", "entity_id"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    round_id: int = Field(index=True)
+    entity_type: str = Field(index=True)   # driver / constructor
+    entity_id: int = Field(index=True)
+    points: float = 0.0
+    payload_hash: str = ""
+    payload: list = Field(default_factory=list, sa_column=Column(JSON))
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class GLLedgerAudit(SQLModel, table=True):
+    __tablename__ = "gl_ledger_audit"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    round_id: int = Field(index=True)
+    entity_type: str = Field(index=True)
+    entity_id: int = Field(index=True)
+    previous_points: float = 0.0
+    new_points: float = 0.0
+    delta: float = 0.0
+    previous_payload_hash: str = ""
+    new_payload_hash: str = ""
+    previous_payload: list = Field(default_factory=list, sa_column=Column(JSON))
+    new_payload: list = Field(default_factory=list, sa_column=Column(JSON))
+    provider_timestamp: Optional[datetime] = None
+    detected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    reason: str = ""
+    run_id: Optional[int] = Field(default=None, foreign_key="ms_data_sync_run.id", index=True)
