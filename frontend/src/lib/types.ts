@@ -45,7 +45,7 @@ export interface Race {
   round: number; name: string; slug: string; location: string; country: string; country_name: string
   circuit: string; laps: number; length_km: number; is_sprint: boolean
   race_start: string; deadline: string; weather: string; status: string
-  circuit_image_url: string
+  circuit_image_url: string; round_state: 'UPCOMING' | 'OPEN' | 'LOCKED' | 'LIVE' | 'PROVISIONAL' | 'FINAL'
   winner: { name: string; short: string } | null
 }
 export interface RaceFull extends Race {
@@ -72,7 +72,7 @@ export interface GameConfig {
 export interface Meta {
   season: number; product: string; provider: string; next_round: number; total_rounds: number
   next_race: Race | null; config: GameConfig; team_name_suggestions: string[]
-  round_id: number; locked: boolean; deadline: string | null
+  round_id: number; locked: boolean; deadline: string | null; last_synced_at: string | null
 }
 
 export interface Profile {
@@ -100,7 +100,7 @@ export interface TeamScore {
 }
 export interface MeResponse {
   profile: Profile; team: TeamState | null
-  score?: TeamScore; rank?: number; field_size?: number; percentile?: number
+  score?: TeamScore; rank?: number; field_size?: number; percentile?: number; gap_to_leader?: number
   weekend?: WeekendScore
 }
 
@@ -116,7 +116,7 @@ export interface LeagueDetail extends LeagueSummary {
   creator: string; members: LeaderboardRow[]
 }
 
-export interface Insight { type: string; text: string; demo: boolean }
+export interface Insight { type: string; text: string }
 
 export interface LiveRaceBrief {
   name: string; location: string; country: string; circuit: string; weather: string

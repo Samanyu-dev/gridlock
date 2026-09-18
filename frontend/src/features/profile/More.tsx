@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { User, Building2, Flag, Trophy, BookOpen, BarChart3, Repeat, Sun, Moon, LogOut, ChevronRight } from 'lucide-react'
+import { User, Building2, Flag, Trophy, BookOpen, BarChart3, Repeat, Activity, Sun, Moon, LogOut, ChevronRight } from 'lucide-react'
 import { useSession } from '../../lib/session'
 
 const LINKS = [
@@ -15,13 +15,14 @@ const LINKS = [
 export default function More() {
   const { theme, toggleTheme, clear, profile } = useSession()
   const navigate = useNavigate()
+  const links = profile?.is_admin ? [...LINKS, { to: '/admin/data-health', label: 'Data feed health', icon: Activity }] : LINKS
   return (
     <div className="page">
       <div className="container">
         <div className="page-head"><span className="eyebrow">{profile?.team_name}</span><h1 className="page-title">More</h1></div>
         <div className="panel" style={{ overflow: 'hidden' }}>
-          {LINKS.map(({ to, label, icon: Icon }, i) => (
-            <Link key={to} to={to} className="row between" style={{ padding: '16px 18px', borderBottom: i < LINKS.length - 1 ? '1px solid var(--line-soft)' : 'none' }}>
+          {links.map(({ to, label, icon: Icon }, i) => (
+            <Link key={to} to={to} className="row between" style={{ padding: '16px 18px', borderBottom: i < links.length - 1 ? '1px solid var(--line-soft)' : 'none' }}>
               <span className="row gap-2"><Icon size={18} className="text-dim" /> {label}</span>
               <ChevronRight size={16} className="text-faint" />
             </Link>

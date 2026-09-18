@@ -73,14 +73,16 @@ def rank_with_ties(rows: List[dict], key: str) -> None:
 
 
 class GameStore:
-    def __init__(self) -> None:
-        self._season: Optional[Season] = None
-
     @property
     def season(self) -> Season:
-        if self._season is None:
-            self._season = get_provider().get_season()
-        return self._season
+        # The provider owns caching/TTL/reconciliation — GameStore must not
+        # add a second, permanent cache on top or a stale season would never
+        # get the chance to refresh.
+        return get_provider().get_season()
+
+    def resync(self) -> Season:
+        """Force a full, deterministic rebuild from the live feed right now."""
+        return get_provider().get_season(force=True)
 
     # -- team scoring --------------------------------------------------------
 

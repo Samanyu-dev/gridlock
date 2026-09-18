@@ -13,7 +13,7 @@ from sqlmodel import Session, select
 
 from ..database import get_session
 from . import deadlines, snapshots, transfers
-from .auth import get_current_user, get_optional_user
+from .auth import get_current_user, get_optional_user, require_admin
 from .models import GLLeague, GLLeagueMember, GLProfile, GLTeam, GLTransfer
 from .provider import get_provider
 from .schemas import (
@@ -184,6 +184,7 @@ def _race_brief(r) -> dict:
         "circuit": r.circuit, "laps": r.laps, "length_km": r.length_km,
         "is_sprint": r.is_sprint, "race_start": _iso(r.race_start), "deadline": _iso(r.deadline),
         "weather": r.weather, "status": r.status, "circuit_image_url": r.circuit_image_url,
+        "round_state": deadlines.round_state(r),
         "winner": {"name": winner.name, "short": winner.short} if winner else None,
     }
 
@@ -212,10 +213,12 @@ def meta():
     s = STORE.season
     nr = s.next_race
     round_id = deadlines.active_round()
+    provider = get_provider()
+    ph = provider.health()
     return {
         "season": s.year,
         "product": "GRIDLOCK",
-        "provider": get_provider().name,
+        "provider": provider.name,
         "next_round": s.next_round,
         "total_rounds": len(s.races),
         "next_race": _race_brief(nr) if nr else None,
@@ -224,6 +227,7 @@ def meta():
         "round_id": round_id,
         "locked": deadlines.is_locked(round_id),
         "deadline": _iso(deadlines.deadline_for_round(round_id)) if deadlines.deadline_for_round(round_id) else None,
+        "last_synced_at": ph.get("last_synced_at"),
     }
 
 
@@ -231,6 +235,32 @@ def meta():
 def rules():
     cfg = scoring_config()
     return {"config": cfg, "rules": describe_rules(), "boosts": BOOSTS}
+
+
+# --------------------------------------------------------------------------- #
+# Admin — data feed health / manual resync.
+# --------------------------------------------------------------------------- #
+
+
+@router.get("/admin/data-health")
+def data_health(_: object = Depends(require_admin)):
+    """Provider status, sync recency, and per-round data completeness — the
+    control room for "is the real feed actually working right now"."""
+    s = STORE.season
+    provider = get_provider()
+    rounds = [{
+        "round": r.round, "name": r.name, "status": r.status,
+        "round_state": deadlines.round_state(r),
+        "has_winner": bool(r.winner_id), "race_start": _iso(r.race_start),
+    } for r in s.races]
+    return {**provider.health(), "rounds": rounds}
+
+
+@router.post("/admin/resync")
+def resync(_: object = Depends(require_admin)):
+    """Force an immediate, full, deterministic rebuild from the live feed."""
+    STORE.resync()
+    return get_provider().health()
 
 
 @router.get("/insights")
@@ -384,11 +414,13 @@ def me(profile: GLProfile = Depends(get_current_user), session: Session = Depend
     result = {"profile": _serialize_profile(profile), "team": _serialize_team(team)}
     if team and team.driver_ids and team.constructor_ids:
         score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
-        rank, field_size = _rank_and_field(_real_leaderboard_rows(session), score["total"])
+        rows = _real_leaderboard_rows(session)
+        rank, field_size = _rank_and_field(rows, score["total"])
         result["score"] = score
         result["rank"] = rank
         result["field_size"] = field_size
         result["percentile"] = round(100 * rank / field_size, 1)
+        result["gap_to_leader"] = max(0, rows[0]["total"] - score["total"]) if rows else 0
         # Live/provisional/final ledger for the most recently completed round.
         last_round = STORE.season.next_round - 1
         result["weekend"] = snapshots.score_team_for_round(

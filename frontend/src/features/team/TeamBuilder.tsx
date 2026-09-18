@@ -252,23 +252,30 @@ export default function TeamBuilder() {
 
             <BoostBar boosts={meta?.config.boosts || []} active={boost} onSelect={(id) => { setBoost(id); if (!id) setBoostDriver(null) }} />
 
-            {boost === 'underdog' && (
-              <div className="panel panel-pad" style={{ marginTop: 12 }}>
-                <span className="eyebrow">Pick your underdog — scores 2× if they finish P6–P10</span>
-                <div className="row gap-2 wrap" style={{ marginTop: 10 }}>
-                  {selDrivers.map((id) => {
-                    const d = dMap.get(id)
-                    if (!d) return null
-                    const picked = boostDriver === id
-                    return (
-                      <button key={id} className={`btn btn-sm ${picked ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setBoostDriver(picked ? null : id)}>
-                        {d.short}
-                      </button>
-                    )
-                  })}
+            {boost === 'underdog' && (() => {
+              const pointsRank = new Map(drivers.map((d, i) => [d.id, i + 1]))
+              const eligible = selDrivers.filter((id) => (pointsRank.get(id) ?? 0) > 5)
+              const excluded = selDrivers.length - eligible.length
+              return (
+                <div className="panel panel-pad" style={{ marginTop: 12 }}>
+                  <span className="eyebrow">Pick your underdog — scores 2× if they finish P6–P10</span>
+                  <div className="row gap-2 wrap" style={{ marginTop: 10 }}>
+                    {eligible.length === 0 && <span className="text-faint" style={{ fontSize: 13 }}>None of your drivers are realistic P6–P10 picks — your whole squad is currently top-5 pace.</span>}
+                    {eligible.map((id) => {
+                      const d = dMap.get(id)
+                      if (!d) return null
+                      const picked = boostDriver === id
+                      return (
+                        <button key={id} className={`btn btn-sm ${picked ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setBoostDriver(picked ? null : id)}>
+                          {d.short}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {excluded > 0 && <div className="text-faint" style={{ fontSize: 12, marginTop: 8 }}>{excluded} driver{excluded > 1 ? 's' : ''} hidden — currently running top-5 pace, not a realistic P6–P10 bet.</div>}
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
 
           {/* MARKET */}

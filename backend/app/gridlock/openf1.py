@@ -22,15 +22,23 @@ import json
 import os
 import time
 import urllib.request
+from datetime import datetime, timezone
 from typing import List, Optional
 from urllib.parse import urlencode
 
 from .provider import MotorsportDataProvider
 from .season import Season, build_season
 
+UTC = timezone.utc
 OPENF1_BASE = os.environ.get("OPENF1_BASE_URL", "https://api.openf1.org/v1")
 OPENF1_TOKEN = os.environ.get("OPENF1_API_KEY")  # only needed for realtime
 HTTP_TIMEOUT = float(os.environ.get("OPENF1_TIMEOUT", "12"))
+# How long a built season is trusted before the next request triggers a full
+# rebuild from OpenF1. A rebuild is a deterministic recompute from whatever
+# OpenF1 currently reports — this *is* the reconciliation mechanism: if a
+# classification changes upstream (e.g. a post-race penalty), the next
+# rebuild reflects it automatically. Nothing is ever hand-patched.
+SEASON_CACHE_TTL = float(os.environ.get("GRIDLOCK_SEASON_CACHE_TTL", "300"))
 
 
 class OpenF1Client:
@@ -94,17 +102,61 @@ class OpenF1Provider(MotorsportDataProvider):
         self.client = OpenF1Client()
         self._season: Optional[Season] = None
         self.last_error: Optional[str] = None
+        self.last_synced_at: Optional[datetime] = None
+        self.last_sync_duration: Optional[float] = None
+        self.last_sync_source: str = "none"  # "openf1" or "fallback"
+        self.sync_count: int = 0
 
-    def get_season(self) -> Season:
-        if self._season is not None:
+    def get_season(self, force: bool = False) -> Season:
+        stale = (
+            self._season is None
+            or self.last_synced_at is None
+            or (datetime.now(UTC) - self.last_synced_at).total_seconds() > SEASON_CACHE_TTL
+        )
+        if not force and not stale:
             return self._season
+        self._sync()
+        return self._season
+
+    def _sync(self) -> None:
+        """One deterministic recompute from whatever OpenF1 reports right
+        now. Never patches individual points — a full, reproducible rebuild
+        is the only way results ever change here."""
+        t0 = time.monotonic()
         try:
             from .normalize import normalize_season
             season = normalize_season(self.client, self.year)
             if season is None:
                 raise RuntimeError("OpenF1 returned no usable data")
             self._season = season
+            self.last_error = None
+            self.last_sync_source = "openf1"
         except Exception as exc:  # defensive: never crash the app on a data issue
             self.last_error = str(exc)
-            self._season = build_season()  # seeded fallback keeps the app alive
-        return self._season
+            if self._season is None:
+                self._season = build_season()  # seeded fallback keeps the app alive
+                self.last_sync_source = "fallback"
+        self.last_sync_duration = round(time.monotonic() - t0, 2)
+        self.last_synced_at = datetime.now(UTC)
+        self.sync_count += 1
+
+    def health(self) -> dict:
+        s = self._season
+        rounds_total = len(s.races) if s else 0
+        rounds_with_winner = sum(1 for r in s.races if r.winner_id) if s else 0
+        rounds_elapsed = sum(1 for r in s.races if r.status == "completed") if s else 0
+        return {
+            "provider": self.name,
+            "season_year": self.year,
+            "last_synced_at": self.last_synced_at.isoformat() if self.last_synced_at else None,
+            "last_sync_duration_seconds": self.last_sync_duration,
+            "last_sync_source": self.last_sync_source,
+            "sync_count": self.sync_count,
+            "cache_ttl_seconds": SEASON_CACHE_TTL,
+            "last_error": self.last_error,
+            "next_round": s.next_round if s else None,
+            "rounds_elapsed": rounds_elapsed,
+            "rounds_with_confirmed_winner": rounds_with_winner,
+            "rounds_total": rounds_total,
+            "data_gaps": rounds_elapsed - rounds_with_winner,
+        }

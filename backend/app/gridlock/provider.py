@@ -22,7 +22,12 @@ class MotorsportDataProvider(ABC):
     live: bool = False
 
     @abstractmethod
-    def get_season(self) -> Season: ...
+    def get_season(self, force: bool = False) -> Season: ...
+
+    def health(self) -> dict:
+        """Default diagnostics for providers with nothing more interesting to
+        report (e.g. the deterministic mock). Real providers override this."""
+        return {"provider": self.name, "last_error": None}
 
 
 class MockMotorsportProvider(MotorsportDataProvider):
@@ -34,10 +39,10 @@ class MockMotorsportProvider(MotorsportDataProvider):
     def __init__(self) -> None:
         self._season: Optional[Season] = None
 
-    def get_season(self) -> Season:
+    def get_season(self, force: bool = False) -> Season:
         # Built once per process; deterministic apart from the "now" anchor,
         # which we freeze at first build so countdowns are stable within a run.
-        if self._season is None:
+        if self._season is None or force:
             self._season = build_season()
         return self._season
 
@@ -52,7 +57,7 @@ class RealMotorsportProvider(MotorsportDataProvider):
     name = "real"
     live = True
 
-    def get_season(self) -> Season:  # pragma: no cover - not wired yet
+    def get_season(self, force: bool = False) -> Season:  # pragma: no cover - not wired yet
         raise NotImplementedError(
             "RealMotorsportProvider is not implemented. Set "
             "MOTORSPORT_DATA_PROVIDER=mock or supply a real feed adapter."

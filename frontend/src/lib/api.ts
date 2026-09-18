@@ -98,9 +98,20 @@ export const api = {
   league: (code: string) => req<LeagueDetail>(`/leagues/${code}`),
 
   search: (q: string) => req<{ results: SearchResult[] }>(`/search${qs({ q })}`),
+
+  dataHealth: () => req<DataHealth>('/admin/data-health'),
+  resync: () => req<DataHealth>('/admin/resync', { method: 'POST' }),
 }
 
 export interface TransferOutcome { transfers: number; free_used: number; penalized: number; penalty: number }
+export interface DataHealth {
+  provider: string; season_year?: number
+  last_synced_at: string | null; last_sync_duration_seconds: number | null
+  last_sync_source: string; sync_count: number; cache_ttl_seconds: number
+  last_error: string | null; next_round: number | null
+  rounds_elapsed: number; rounds_with_confirmed_winner: number; rounds_total: number; data_gaps: number
+  rounds: { round: number; name: string; status: string; round_state: string; has_winner: boolean; race_start: string }[]
+}
 export interface TransferRow {
   round: number; asset_type: 'driver' | 'constructor'
   sold: string | null; bought: string | null

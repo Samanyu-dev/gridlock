@@ -10,6 +10,7 @@ import Login from './features/onboarding/Login'
 import Dashboard from './features/dashboard/Dashboard'
 import TeamBuilder from './features/team/TeamBuilder'
 import TransferHistory from './features/team/TransferHistory'
+import DataHealth from './features/admin/DataHealth'
 import Drivers from './features/drivers/Drivers'
 import DriverProfile from './features/drivers/DriverProfile'
 import Constructors from './features/constructors/Constructors'
@@ -42,6 +43,7 @@ function AppRoutes() {
         <Route path="/home" element={<RequireUser><Dashboard /></RequireUser>} />
         <Route path="/team" element={<RequireUser><TeamBuilder /></RequireUser>} />
         <Route path="/team/transfers" element={<RequireUser><TransferHistory /></RequireUser>} />
+        <Route path="/admin/data-health" element={<RequireUser><DataHealth /></RequireUser>} />
         <Route path="/drivers" element={<RequireUser><Drivers /></RequireUser>} />
         <Route path="/drivers/:slug" element={<RequireUser><DriverProfile /></RequireUser>} />
         <Route path="/constructors" element={<RequireUser><Constructors /></RequireUser>} />

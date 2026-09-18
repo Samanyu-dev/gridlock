@@ -141,3 +141,21 @@ def test_oauth_reports_unconfigured(client):
     r = client.get("/api/auth/oauth/google")
     assert r.status_code == 503
     assert "configured" in r.json()["detail"].lower()
+
+
+def test_admin_endpoints_require_admin(client):
+    data = _register(client)
+    hdr = {"Authorization": f"Bearer {data['access_token']}"}
+    assert client.get("/api/admin/data-health").status_code == 401
+    assert client.get("/api/admin/data-health", headers=hdr).status_code == 403
+    assert client.post("/api/admin/resync", headers=hdr).status_code == 403
+
+
+def test_race_briefs_carry_a_round_state(client):
+    races = client.get("/api/races").json()["races"]
+    assert races
+    valid = {"UPCOMING", "OPEN", "LOCKED", "LIVE", "PROVISIONAL", "FINAL"}
+    assert all(r["round_state"] in valid for r in races)
+    # Exactly one round is the active pick — everything before it is settled,
+    # everything after is a future round still to come.
+    assert sum(1 for r in races if r["round_state"] == "OPEN") <= 1
