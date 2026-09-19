@@ -182,3 +182,5 @@ export interface OptimalTeamReport {
   optimal_captain_id: number; optimal_underdog_id: number | null
   breakdown: OptimalMissedRow[]
 }
+
+export interface Notification { type: string; severity: 'info' | 'warning' | 'urgent'; round: number; text: string }

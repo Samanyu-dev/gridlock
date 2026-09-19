@@ -2,7 +2,7 @@ import type {
   Meta, Driver, DriverFull, Constructor, ConstructorFull, Race, RaceFull,
   MeResponse, Profile, TeamState, TeamScore, LeaderboardRow, LeagueSummary,
   LeagueDetail, Insight, LiveSnapshot, SearchResult, Boost, WeekendScore, OwnershipReport,
-  H2HReport, LiveBattleReport, TransferTrendsReport, OptimalTeamReport,
+  H2HReport, LiveBattleReport, TransferTrendsReport, OptimalTeamReport, Notification,
 } from './types'
 
 const TOKEN_KEY = 'gridlock.token'
@@ -104,6 +104,7 @@ export const api = {
   liveBattle: (rival: string) => req<LiveBattleReport>(`/live/battle${qs({ rival: rival.replace(/^@/, '') })}`),
   optimalTeam: (round: number) => req<OptimalTeamReport>(`/optimal-team/${round}`),
   transferTrends: (league?: string) => req<TransferTrendsReport>(`/transfers/trends${qs({ league })}`),
+  notifications: () => req<{ notifications: Notification[] }>('/notifications'),
 
   dataHealth: () => req<DataHealth>('/admin/data-health'),
   resync: () => req<DataHealth>('/admin/resync', { method: 'POST' }),

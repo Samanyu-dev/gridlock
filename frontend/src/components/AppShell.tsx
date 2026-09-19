@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { Home, Users, Radio, Flag, UserRound, Layers, Trophy, MoreHorizontal, Settings, Sun, Moon } from 'lucide-react'
 import { BrandGlyph } from './Brand'
 import { CommandPalette } from './CommandPalette'
+import { NotificationBell } from './NotificationBell'
 import { useSession } from '../lib/session'
 
 const RAIL = [
@@ -53,7 +54,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="shell__main">
         <header className="shell__topbar">
           <span className="shell__welcome">Welcome back, {profile?.display_name || profile?.username || 'racer'}</span>
-          <CommandPalette />
+          <div className="row gap-2" style={{ marginLeft: 'auto', alignItems: 'center' }}>
+            <CommandPalette />
+            <NotificationBell />
+          </div>
         </header>
         <div className="shell__content">{children}</div>
       </div>

@@ -15,6 +15,7 @@ from sqlmodel import Session, select
 from ..database import get_session
 from . import deadlines, snapshots, transfers
 from . import h2h as h2h_mod
+from . import notifications as notifications_mod
 from . import optimal_team as optimal_mod
 from . import ownership as ownership_mod
 from . import transfer_trends as trends_mod
@@ -720,6 +721,31 @@ def me(profile: GLProfile = Depends(get_current_user), session: Session = Depend
             team.active_boost, team.boost_driver_id, team.boost_constructor_id, last_round,
         )
     return result
+
+
+@router.get("/notifications")
+def notifications_endpoint(
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Real, derived-on-read alerts — captain missing, unused transfer/
+    Underdog, lock reminders, results final, score corrected, rank
+    movement. Nothing here is stored; every item reflects current state."""
+    out = notifications_mod.compute_notifications(session, profile.id)
+
+    team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile.id)).first()
+    if team and team.driver_ids and team.constructor_ids:
+        score = STORE.score_team(team.driver_ids, team.constructor_ids, team.captain_id)
+        rows = _real_leaderboard_rows(session)
+        me_row = next((r for r in rows if r.get("profile_id") == profile.id), None)
+        if me_row and abs(me_row["movement"]) >= 2:
+            direction = "up" if me_row["movement"] > 0 else "down"
+            out.append({
+                "type": "rank_movement", "severity": "info" if direction == "up" else "warning",
+                "round": STORE.season.next_round - 1,
+                "text": f"You moved {direction} {abs(me_row['movement'])} place{'s' if abs(me_row['movement']) != 1 else ''} on the leaderboard after the last round.",
+            })
+    return {"notifications": out}
 
 
 @router.post("/team/validate")
