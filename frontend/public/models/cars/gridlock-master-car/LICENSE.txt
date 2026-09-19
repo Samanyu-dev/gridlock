@@ -1,0 +1,20 @@
+Source: Kenney "Racing Kit" (raceCarRed.glb) — https://kenney.nl/assets/racing-kit
+License: CC0 1.0 Universal (public domain) — no attribution required, free for commercial use.
+Author: Kenney (www.kenney.nl)
+
+Processing performed by GRIDLOCK (frontend/scripts/build-car-asset.mjs):
+- renamed nodes/meshes/materials to the GL_Car_* naming convention
+- converted materials from KHR_materials_unlit (flat game-asset shading) to
+  a standard PBR metallic-roughness workflow, so the showroom's key/fill/
+  rim lighting actually affects the car instead of being ignored
+- deduplicated + pruned unused data
+- produced high/medium/low LOD tiers, medium and low Meshopt-compressed
+
+Status: placeholder ("draft" in the asset manifest). This is a generic
+low-poly race car body, not an authentic open-wheel Formula-style
+silhouette — it exists so the R3F rendering pipeline (showroom, homepage
+hero, driver showroom) can be built and tested against a real, licensed,
+correctly-structured GLB. Swap in a proper open-wheel car later by
+replacing these three files and bumping the manifest's `version` — no
+component code needs to change, since everything reads model paths from
+the manifest.

@@ -31,6 +31,7 @@ const More = lazy(() => import('./features/profile/More'))
 const Ownership = lazy(() => import('./features/ownership/Ownership'))
 const H2H = lazy(() => import('./features/h2h/H2H'))
 const TransferTrends = lazy(() => import('./features/transfers/TransferTrends'))
+const CarShowroom = lazy(() => import('./features/showroom/CarShowroom'))
 
 function RequireUser({ children }: { children: ReactNode }) {
   const { authed } = useSession()
@@ -70,6 +71,7 @@ function AppRoutes() {
           <Route path="/ownership" element={<RequireUser><Ownership /></RequireUser>} />
           <Route path="/h2h/:username" element={<RequireUser><H2H /></RequireUser>} />
           <Route path="/transfers/trends" element={<RequireUser><TransferTrends /></RequireUser>} />
+          <Route path="/showroom" element={<RequireUser><CarShowroom /></RequireUser>} />
           <Route path="/rules" element={<RequireUser><Rules /></RequireUser>} />
           <Route path="/profile" element={<RequireUser><Profile /></RequireUser>} />
           <Route path="/more" element={<RequireUser><More /></RequireUser>} />

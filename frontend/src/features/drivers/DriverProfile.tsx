@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Avatar, Sparkline, FormPill, Skeleton } from '../../components/bits'
+import { DriverCarPanel } from './DriverCarPanel'
 import { api } from '../../lib/api'
 import { flagEmoji, money, statusLabel } from '../../lib/format'
 import type { DriverFull } from '../../lib/types'
@@ -51,6 +52,10 @@ export default function DriverProfile() {
               <span className="text-faint" style={{ fontSize: 11 }}>{d.transfer_trend.in} in · {d.transfer_trend.out} out</span>
             </div>
           </div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <DriverCarPanel color={color} name={d.short || d.name} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20 }} className="dash-grid">

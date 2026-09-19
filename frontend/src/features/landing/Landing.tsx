@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Gauge, Trophy, Users, Radio, Zap, LineChart } from 'lucide-react'
 import { Brand } from '../../components/Brand'
 import { RacingLine } from '../../components/RacingLine'
-import { SpeedBackground } from '../../components/SpeedBackground'
 import { Countdown, CountUp } from '../../components/motion'
 import { Avatar, Delta } from '../../components/bits'
 import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { flagEmoji, money } from '../../lib/format'
 import type { Driver, LeaderboardRow, Meta } from '../../lib/types'
+
+// three.js + R3F are heavy — split into their own chunk so every visitor to
+// "/" (including ones who never see the hero render) doesn't pay for it in
+// the initial bundle.
+const HeroCarScene = lazy(() => import('./HeroCarScene').then((m) => ({ default: m.HeroCarScene })))
 
 export default function Landing() {
   const navigate = useNavigate()
@@ -59,9 +63,11 @@ export default function Landing() {
 
       {/* Hero */}
       <section style={{ position: 'relative', overflow: 'hidden', minHeight: '82vh', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0 }} aria-hidden>
-          <SpeedBackground intensity={1.2} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(8,9,11,.55) 0%, rgba(8,9,11,.72) 55%, var(--bg) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: '#05060a' }} aria-hidden>
+          <Suspense fallback={null}>
+            <HeroCarScene />
+          </Suspense>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(8,9,11,.35) 0%, rgba(8,9,11,.55) 55%, var(--bg) 100%)' }} />
         </div>
         <div className="container" style={{ position: 'relative', padding: '48px 20px 40px', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 40, alignItems: 'center' }}>
           <div>
