@@ -57,3 +57,10 @@ export function urgency(iso: string): 'locked' | 'urgent' | 'soon' | 'near' | 'n
 export function statusLabel(s: string): string {
   return { finished: 'FIN', classified: 'CLA', dnf: 'DNF', dns: 'DNS', dsq: 'DSQ' }[s] || s.toUpperCase()
 }
+
+/** One color per round lifecycle state, shared by the calendar and the
+ *  admin data-health page so a state always reads the same everywhere. */
+export const ROUND_STATE_COLOR: Record<string, string> = {
+  UPCOMING: 'var(--text-faint)', OPEN: 'var(--info)', LOCKED: 'var(--caution)',
+  LIVE: 'var(--red)', PROVISIONAL: 'var(--caution)', FINAL: 'var(--gain)',
+}

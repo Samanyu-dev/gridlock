@@ -2,12 +2,8 @@ import { useEffect, useState } from 'react'
 import { RefreshCw, AlertTriangle, CheckCircle2, History } from 'lucide-react'
 import { Skeleton } from '../../components/bits'
 import { api, type DataHealth as DataHealthType, type LedgerAuditGroup } from '../../lib/api'
+import { ROUND_STATE_COLOR as STATE_COLOR } from '../../lib/format'
 import { useSession } from '../../lib/session'
-
-const STATE_COLOR: Record<string, string> = {
-  UPCOMING: 'var(--text-faint)', OPEN: 'var(--info)', LOCKED: 'var(--caution)',
-  LIVE: 'var(--red)', PROVISIONAL: 'var(--caution)', FINAL: 'var(--gain)',
-}
 
 export default function DataHealth() {
   const { profile } = useSession()
