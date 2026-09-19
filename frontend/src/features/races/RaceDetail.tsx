@@ -78,7 +78,7 @@ export default function RaceDetail() {
             <div>
               <span className="eyebrow row gap-2" style={{ alignItems: 'center' }}>Round {r.round}{r.is_sprint && <SprintBadge />}</span>
               <h1 className="display" style={{ fontSize: 'clamp(30px,5vw,54px)', margin: '4px 0' }}>{flagEmoji(r.country)} {r.name}</h1>
-              <span className="text-dim">{r.circuit} · {r.laps} laps · {r.length_km} km · {r.weather}</span>
+              <span className="text-dim"><Link to={`/circuits/${r.slug}`} style={{ color: 'inherit', textDecoration: 'underline' }}>{r.circuit}</Link> · {r.laps} laps · {r.length_km} km · {r.weather}</span>
             </div>
             <div style={{ width: 260, height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {r.circuit_image_url

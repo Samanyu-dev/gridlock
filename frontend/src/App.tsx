@@ -17,6 +17,7 @@ import Constructors from './features/constructors/Constructors'
 import ConstructorProfile from './features/constructors/ConstructorProfile'
 import Races from './features/races/Races'
 import RaceDetail from './features/races/RaceDetail'
+import Circuit from './features/races/Circuit'
 import Live from './features/live/Live'
 import Leagues from './features/leagues/Leagues'
 import League from './features/leagues/League'
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="/constructors/:slug" element={<RequireUser><ConstructorProfile /></RequireUser>} />
         <Route path="/races" element={<RequireUser><Races /></RequireUser>} />
         <Route path="/races/:slug" element={<RequireUser><RaceDetail /></RequireUser>} />
+        <Route path="/circuits/:slug" element={<RequireUser><Circuit /></RequireUser>} />
         <Route path="/live" element={<RequireUser><Live /></RequireUser>} />
         <Route path="/leagues" element={<RequireUser><Leagues /></RequireUser>} />
         <Route path="/leagues/:code" element={<RequireUser><League /></RequireUser>} />
