@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ChevronDown, Radio, Users, Swords } from 'lucide-react'
 import { Countdown } from '../../components/motion'
 import { Skeleton, SprintBadge } from '../../components/bits'
+import { ShareButton } from '../../components/ShareButton'
 import { StateBadge } from '../../components/ScoreBreakdown'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
@@ -162,7 +163,22 @@ export default function Live() {
             {/* Optimal Team / Missed Points Analysis — only once the round is FINAL */}
             {optimal && (
               <div className="panel panel-pad">
-                <span className="section-title" style={{ fontSize: 16 }}>Optimal team analysis</span>
+                <div className="row between" style={{ alignItems: 'center' }}>
+                  <span className="section-title" style={{ fontSize: 16 }}>Optimal team analysis</span>
+                  <ShareButton
+                    filename={`gridlock-optimal-round-${optimal.round}.png`}
+                    spec={{
+                      eyebrow: `Round ${optimal.round} efficiency`,
+                      title: nr?.name ?? 'This round',
+                      bigStat: `${optimal.efficiency}%`, bigStatLabel: 'Efficiency',
+                      rows: [
+                        { label: 'Your score', value: `${optimal.actual_total}` },
+                        { label: 'Optimal', value: `${optimal.optimal_total}` },
+                        { label: 'Missed', value: `${optimal.missed_points}` },
+                      ],
+                    }}
+                  />
+                </div>
                 <div className="grid g3" style={{ marginTop: 12, gap: 8 }}>
                   <div className="col" style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6 }}>
                     <span className="eyebrow">Your score</span><span className="num" style={{ fontWeight: 800, fontSize: 20 }}>{optimal.actual_total}</span>

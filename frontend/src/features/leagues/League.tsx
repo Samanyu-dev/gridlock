@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Copy, Check, Share2 } from 'lucide-react'
 import { Delta, Skeleton } from '../../components/bits'
+import { ShareButton } from '../../components/ShareButton'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
 import type { LeagueDetail } from '../../lib/types'
@@ -23,7 +24,8 @@ export default function League() {
   }
 
   if (!lg) return <div className="page container"><Skeleton h={160} /></div>
-  const myRank = lg.members.find((m) => m.is_me)?.league_rank
+  const me = lg.members.find((m) => m.is_me)
+  const myRank = me?.league_rank
 
   return (
     <div className="page">
@@ -41,6 +43,21 @@ export default function League() {
               <div className="row gap-2">
                 <button className="btn btn-ghost btn-sm" onClick={copy}>{copied ? <Check size={14} /> : <Copy size={14} />} {lg.code}</button>
                 <button className="btn btn-primary btn-sm" onClick={share}><Share2 size={14} /> Invite</button>
+                {me && (
+                  <ShareButton
+                    label="Share standing"
+                    filename={`gridlock-${lg.code}-standing.png`}
+                    spec={{
+                      eyebrow: lg.name, title: `${me.team_name} · #${myRank} of ${lg.member_count}`,
+                      bigStat: me.total.toLocaleString(), bigStatLabel: 'Season points',
+                      rows: [
+                        { label: 'Rank', value: `#${myRank}` },
+                        { label: 'Last race', value: `${me.last_race >= 0 ? '+' : ''}${me.last_race}` },
+                        { label: 'Managers', value: `${lg.member_count}` },
+                      ],
+                    }}
+                  />
+                )}
               </div>
               <span className="eyebrow">{lg.member_count} managers{myRank ? ` · you're #${myRank}` : ''}</span>
             </div>

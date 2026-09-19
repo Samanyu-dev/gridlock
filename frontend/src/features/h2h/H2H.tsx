@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, Swords } from 'lucide-react'
 import { Skeleton } from '../../components/bits'
+import { ShareButton } from '../../components/ShareButton'
 import { api } from '../../lib/api'
 import type { H2HReport, H2HRef } from '../../lib/types'
 
@@ -28,7 +29,22 @@ export default function H2H() {
   return (
     <div className="page">
       <div className="container">
-        <Link to="/leagues" className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}><ArrowLeft size={15} /> Leagues</Link>
+        <div className="row between" style={{ marginBottom: 16 }}>
+          <Link to="/leagues" className="btn btn-ghost btn-sm"><ArrowLeft size={15} /> Leagues</Link>
+          <ShareButton
+            filename={`gridlock-h2h-${a.username}-vs-${b.username}.png`}
+            spec={{
+              eyebrow: 'Head-to-head',
+              title: data.gap >= 0 ? `${a.username} leads ${b.username}` : `${b.username} leads ${a.username}`,
+              bigStat: `${data.gap >= 0 ? '+' : ''}${data.gap}`, bigStatLabel: 'Points gap',
+              rows: [
+                { label: a.username, value: a.total.toLocaleString() },
+                { label: b.username, value: b.total.toLocaleString() },
+                { label: 'Rounds record', value: `${data.rounds_record.a}-${data.rounds_record.b}-${data.rounds_record.ties}` },
+              ],
+            }}
+          />
+        </div>
 
         <div className="panel panel-pad" style={{ marginBottom: 20 }}>
           <div className="row between wrap gap-3" style={{ alignItems: 'center' }}>

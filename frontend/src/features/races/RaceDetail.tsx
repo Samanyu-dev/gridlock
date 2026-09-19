@@ -4,9 +4,11 @@ import { ArrowLeft } from 'lucide-react'
 import { Countdown } from '../../components/motion'
 import { CircuitTrace } from './CircuitTrace'
 import { Skeleton, SprintBadge } from '../../components/bits'
+import { ShareButton } from '../../components/ShareButton'
 import { api } from '../../lib/api'
 import { flagEmoji, localTime, localWeekday, statusLabel, userTimezone } from '../../lib/format'
-import type { ClassificationRow, QualiRow, RaceFull } from '../../lib/types'
+import { useSession } from '../../lib/session'
+import type { ClassificationRow, QualiRow, RaceFull, WeekendScore } from '../../lib/types'
 
 const TABS = ['Overview', 'Schedule', 'Results', 'Grid']
 const SPRINT_TABS = ['Overview', 'Schedule', 'Sprint Grid', 'Sprint Results', 'Grid', 'Results']
@@ -61,9 +63,14 @@ function ResultsTable({ rows, empty }: { rows: ClassificationRow[]; empty: strin
 
 export default function RaceDetail() {
   const { slug } = useParams()
+  const { authed } = useSession()
   const [r, setR] = useState<RaceFull | null>(null)
+  const [weekend, setWeekend] = useState<WeekendScore | null>(null)
   const [tab, setTab] = useState('Overview')
   useEffect(() => { if (slug) api.race(slug).then(setR).catch(() => {}) }, [slug])
+  useEffect(() => {
+    if (authed && r?.status === 'completed') api.teamScore(r.round).then(setWeekend).catch(() => {})
+  }, [authed, r])
   if (!r) return <div className="page container"><Skeleton h={220} /></div>
   const done = r.status === 'completed'
   const tabs = r.is_sprint ? SPRINT_TABS : TABS
@@ -71,7 +78,25 @@ export default function RaceDetail() {
   return (
     <div className="page">
       <div className="container">
-        <Link to="/races" className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}><ArrowLeft size={15} /> Calendar</Link>
+        <div className="row between" style={{ marginBottom: 16 }}>
+          <Link to="/races" className="btn btn-ghost btn-sm"><ArrowLeft size={15} /> Calendar</Link>
+          {done && (
+            <ShareButton
+              filename={`gridlock-${r.slug}.png`}
+              spec={{
+                eyebrow: `Round ${r.round}${r.is_sprint ? ' · Sprint weekend' : ''}`,
+                title: r.name,
+                bigStat: weekend ? `${weekend.total}` : (r.winner?.short ?? '—'),
+                bigStatLabel: weekend ? 'Your fantasy points' : 'Race winner',
+                rows: [
+                  { label: 'Winner', value: r.winner?.short ?? '—' },
+                  { label: 'Fastest lap', value: r.fastest_lap?.short ?? '—' },
+                  { label: 'Circuit', value: r.circuit },
+                ],
+              }}
+            />
+          )}
+        </div>
 
         <div className="panel" style={{ overflow: 'hidden', marginBottom: 20 }}>
           <div className="row between wrap" style={{ padding: 28 }}>
