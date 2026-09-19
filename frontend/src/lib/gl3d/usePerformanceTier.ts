@@ -15,7 +15,10 @@ function detectTier(): PerformanceTier {
   }
   if (!gl) return 'static'
 
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  // iPadOS reports as "Macintosh" in the UA string by default (desktop-site
+  // spoofing since iOS 13) — a touch-capable "Mac" is actually an iPad.
+  const isSpoofedIPad = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || isSpoofedIPad
   const cores = navigator.hardwareConcurrency || 4
   const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4
 

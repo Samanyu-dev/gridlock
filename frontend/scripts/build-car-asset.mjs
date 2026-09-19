@@ -20,7 +20,7 @@
  */
 import { NodeIO } from '@gltf-transform/core'
 import { ALL_EXTENSIONS, KHRMaterialsUnlit } from '@gltf-transform/extensions'
-import { dedup, prune, simplify, weld, meshopt } from '@gltf-transform/functions'
+import { dedup, prune, simplify, weld, meshopt, getBounds } from '@gltf-transform/functions'
 import { MeshoptSimplifier, MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -78,6 +78,24 @@ async function renamed() {
   doc.getRoot().listExtensionsUsed()
     .filter((ext) => ext instanceof KHRMaterialsUnlit)
     .forEach((ext) => ext.dispose())
+
+  // Recenter: the source's root node carried an arbitrary export offset, so
+  // every CAMERA_PRESETS target (all assuming the car sits at the origin)
+  // was framing slightly off-center. Shift GL_Car_Root so X/Z center on the
+  // origin and the wheels' lowest point sits exactly on the ground plane
+  // (y=0), matching EnvironmentRig's contact-shadow plane. Any future
+  // asset dropped into this same pipeline gets recentered the same way —
+  // this isn't a one-off fix for this particular model.
+  const rootNode = doc.getRoot().listNodes().find((n) => n.getName() === 'GL_Car_Root')
+  const scene = doc.getRoot().listScenes()[0]
+  if (rootNode && scene) {
+    const { min, max } = getBounds(scene)
+    const [tx, ty, tz] = rootNode.getTranslation()
+    const centerX = (min[0] + max[0]) / 2
+    const centerZ = (min[2] + max[2]) / 2
+    rootNode.setTranslation([tx - centerX, ty - min[1], tz - centerZ])
+  }
+
   await doc.transform(dedup(), prune())
   return doc
 }
