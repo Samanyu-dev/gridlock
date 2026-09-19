@@ -17,17 +17,25 @@ export interface ModelViewerProps {
   /** Recolors the body material for this instance only (e.g. a driver's
    * constructor color) — never mutates the shared cached material. */
   bodyColor?: string
+  /** Overrides the reveal transition's key (defaults to asset+quality) —
+   * the garage passes the selected driver/constructor id so switching the
+   * selection re-triggers the pop-in even when the color doesn't change. */
+  transitionKey?: unknown
+  /** Adds the captain's slow "restrained" breathing scale pulse. */
+  breathe?: boolean
 }
 
 /** Loads a manifest car asset and renders it with drag/idle/zoom/parallax
- * interaction — the one component the showroom, homepage hero, and driver
- * page's car tab all mount instead of each wiring useGLTF + pointer
- * handling themselves. */
-export function ModelViewer({ asset, quality = 'medium', interactive = true, interactionOptions, interactionState, bodyColor }: ModelViewerProps) {
+ * interaction — the one component the showroom, homepage hero, driver
+ * page's car tab, and garage all mount instead of each wiring useGLTF +
+ * pointer handling themselves. */
+export function ModelViewer({
+  asset, quality = 'medium', interactive = true, interactionOptions, interactionState, bodyColor, transitionKey, breathe,
+}: ModelViewerProps) {
   const { scene } = useCarModel(asset, quality, bodyColor)
   const groupRef = useRef<Group>(null)
   useInteractionController(groupRef, { ...interactionOptions, enabled: interactive }, interactionState)
-  const revealRef = useSceneTransition(asset.id + quality)
+  const revealRef = useSceneTransition(transitionKey ?? asset.id + quality, { breathe })
 
   return (
     <group ref={revealRef}>

@@ -3,7 +3,7 @@ import { useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import type { InteractionState } from './InteractionController'
 
-export type CameraPreset = 'HIDDEN' | 'HERO' | 'FRONT' | 'SIDE' | 'REAR' | 'TOP' | 'COCKPIT'
+export type CameraPreset = 'HIDDEN' | 'HERO' | 'FRONT' | 'SIDE' | 'REAR' | 'TOP' | 'COCKPIT' | 'SPOTLIGHT'
 
 interface PresetSpec { position: [number, number, number]; target: [number, number, number]; fov: number }
 
@@ -18,6 +18,8 @@ export const CAMERA_PRESETS: Record<CameraPreset, PresetSpec> = {
   REAR: { position: [0, 1.1, -4.6], target: [0, 0.55, 0], fov: 28 },
   TOP: { position: [0.01, 5.6, 0.01], target: [0, 0, 0], fov: 32 },
   COCKPIT: { position: [0, 0.85, 0.3], target: [0, 0.85, 3], fov: 60 },
+  // Elevated, slightly closer ¾ view — the garage's captain treatment.
+  SPOTLIGHT: { position: [2.6, 2.1, 3.3], target: [0, 0.5, 0], fov: 30 },
 }
 
 interface CameraRigProps {

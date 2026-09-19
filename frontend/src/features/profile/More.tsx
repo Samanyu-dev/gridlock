@@ -10,6 +10,7 @@ const LINKS = [
   { to: '/ownership', label: 'Ownership', icon: Users },
   { to: '/transfers/trends', label: 'Transfer trends', icon: ArrowLeftRight },
   { to: '/team/transfers', label: 'Transfer history', icon: Repeat },
+  { to: '/garage', label: 'Garage (3D)', icon: Box },
   { to: '/showroom', label: 'Car showroom (3D)', icon: Box },
   { to: '/rules', label: 'How to play', icon: BookOpen },
   { to: '/profile', label: 'Profile & achievements', icon: BarChart3 },

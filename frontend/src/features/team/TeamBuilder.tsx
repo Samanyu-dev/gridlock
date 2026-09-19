@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, X, Search, Info, Check, Lock, ArrowRight, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, X, Search, Info, Check, Lock, ArrowRight, AlertTriangle, TrendingUp, TrendingDown, Box } from 'lucide-react'
 import { Avatar, PriceDelta, FormPill } from '../../components/bits'
 import { CountUp, Countdown } from '../../components/motion'
 import { DriverDrawer } from './DriverDrawer'
@@ -135,6 +136,7 @@ export default function TeamBuilder() {
             <h1 className="page-title">My Grid</h1>
           </div>
           <div className="row gap-3 wrap" style={{ alignItems: 'center' }}>
+            <Link to="/garage" className="btn btn-ghost btn-sm"><Box size={14} /> Garage</Link>
             {meta?.deadline && (
               <div className="col" style={{ alignItems: 'flex-end' }}>
                 <span className="eyebrow">{locked ? 'Team locked' : 'Locks in'}</span>
