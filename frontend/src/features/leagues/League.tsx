@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Copy, Check, Share2 } from 'lucide-react'
+import { ArrowLeft, Copy, Check, Share2, UserPlus, Trophy, TrendingUp, Repeat } from 'lucide-react'
 import { Delta, Skeleton } from '../../components/bits'
 import { ShareButton } from '../../components/ShareButton'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
-import type { LeagueDetail } from '../../lib/types'
+import type { LeagueActivityEvent, LeagueDetail } from '../../lib/types'
+
+const EVENT_ICON = { join: UserPlus, round_win: Trophy, boost: TrendingUp, transfer: Repeat } as const
 
 export default function League() {
   const { code } = useParams()
   const [lg, setLg] = useState<LeagueDetail | null>(null)
+  const [activity, setActivity] = useState<LeagueActivityEvent[] | null>(null)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => { if (code) api.league(code).then(setLg).catch(() => {}) }, [code])
+  useEffect(() => { if (code) api.leagueActivity(code).then((r) => setActivity(r.events)).catch(() => setActivity([])) }, [code])
 
   const copy = () => {
     navigator.clipboard?.writeText(lg!.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }).catch(() => {})
@@ -84,6 +88,25 @@ export default function League() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="panel panel-pad" style={{ marginTop: 20 }}>
+          <span className="section-title" style={{ fontSize: 16, display: 'block', marginBottom: 10 }}>Activity</span>
+          {activity === null && <Skeleton h={120} />}
+          {activity && activity.length === 0 && <p className="text-faint" style={{ fontSize: 13 }}>Nothing yet — activity appears here as rounds complete and picks lock in.</p>}
+          {activity && activity.length > 0 && (
+            <div className="col gap-1">
+              {activity.map((e, i) => {
+                const Icon = EVENT_ICON[e.type as keyof typeof EVENT_ICON] || UserPlus
+                return (
+                  <div key={i} className="row gap-2" style={{ padding: '7px 0', alignItems: 'flex-start' }}>
+                    <Icon size={15} className="text-faint" style={{ marginTop: 2, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13 }}>{e.text}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

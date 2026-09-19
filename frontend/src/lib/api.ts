@@ -2,7 +2,7 @@ import type {
   Meta, Driver, DriverFull, Constructor, ConstructorFull, Race, RaceFull,
   MeResponse, Profile, TeamState, TeamScore, LeaderboardRow, LeagueSummary,
   LeagueDetail, Insight, LiveSnapshot, SearchResult, Boost, WeekendScore, OwnershipReport,
-  H2HReport, LiveBattleReport, TransferTrendsReport, OptimalTeamReport, Notification,
+  H2HReport, LiveBattleReport, TransferTrendsReport, OptimalTeamReport, Notification, LeagueActivityEvent,
 } from './types'
 
 const TOKEN_KEY = 'gridlock.token'
@@ -97,6 +97,7 @@ export const api = {
   joinLeague: (p: { code: string }) =>
     req<{ code: string; joined: boolean }>('/leagues/join', { method: 'POST', body: JSON.stringify(p) }),
   league: (code: string) => req<LeagueDetail>(`/leagues/${code}`),
+  leagueActivity: (code: string) => req<{ league: string; events: LeagueActivityEvent[] }>(`/leagues/${code}/activity`),
 
   search: (q: string) => req<{ results: SearchResult[] }>(`/search${qs({ q })}`),
   ownership: (league?: string) => req<OwnershipReport>(`/ownership${qs({ league })}`),

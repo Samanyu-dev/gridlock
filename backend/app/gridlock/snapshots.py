@@ -37,7 +37,7 @@ def resolve_team(session: Session, profile_id: int, round_id: int) -> Optional[d
         return {
             "driver_ids": snap.driver_ids, "constructor_ids": snap.constructor_ids,
             "captain_id": snap.captain_id, "active_boost": snap.active_boost,
-            "boost_driver_id": snap.boost_driver_id,
+            "boost_driver_id": snap.boost_driver_id, "boost_constructor_id": snap.boost_constructor_id,
         }
     team = session.exec(select(GLTeam).where(GLTeam.profile_id == profile_id)).first()
     if not team or not team.driver_ids:
@@ -45,7 +45,7 @@ def resolve_team(session: Session, profile_id: int, round_id: int) -> Optional[d
     return {
         "driver_ids": team.driver_ids, "constructor_ids": team.constructor_ids,
         "captain_id": team.captain_id, "active_boost": team.active_boost,
-        "boost_driver_id": team.boost_driver_id,
+        "boost_driver_id": team.boost_driver_id, "boost_constructor_id": team.boost_constructor_id,
     }
 
 

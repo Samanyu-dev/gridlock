@@ -184,3 +184,5 @@ export interface OptimalTeamReport {
 }
 
 export interface Notification { type: string; severity: 'info' | 'warning' | 'urgent'; round: number; text: string }
+
+export interface LeagueActivityEvent { type: string; round: number | null; at: string; text: string }

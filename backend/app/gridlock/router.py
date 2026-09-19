@@ -15,6 +15,7 @@ from sqlmodel import Session, select
 from ..database import get_session
 from . import deadlines, snapshots, transfers
 from . import h2h as h2h_mod
+from . import league_activity as league_activity_mod
 from . import notifications as notifications_mod
 from . import optimal_team as optimal_mod
 from . import ownership as ownership_mod
@@ -1049,6 +1050,27 @@ def league_detail(code: str, p: Optional[GLProfile] = Depends(get_optional_user)
         "creator": next((m["team_name"] for m in members), "—"),
         "member_count": len(members), "members": members,
     }
+
+
+@router.get("/leagues/{code}/activity")
+def league_activity_endpoint(
+    code: str,
+    profile: GLProfile = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Real activity only — joins, round wins, and boosts/transfers already
+    safe to reveal (their round is locked). Members-only."""
+    code = code.strip().upper()
+    if not code.startswith("GRID-"):
+        code = "GRID-" + code
+    lg = session.exec(select(GLLeague).where(GLLeague.code == code)).first()
+    if not lg:
+        raise HTTPException(404, "League not found")
+    member_ids = [m.profile_id for m in session.exec(select(GLLeagueMember).where(GLLeagueMember.league_id == lg.id))]
+    if profile.id not in member_ids:
+        raise HTTPException(403, "You must be a member of this league to see its activity.")
+    events = league_activity_mod.compute_activity(session, lg.id)
+    return {"league": lg.name, "events": events}
 
 
 # --------------------------------------------------------------------------- #
