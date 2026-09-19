@@ -4,7 +4,7 @@ import { GLShowroom, ModelViewer, CameraRig, LightingRig, EnvironmentRig } from 
 import type { CameraPreset, InteractionState } from '../../components/gl3d'
 import { getAsset } from '../../lib/gl3d/manifest'
 
-const asset = getAsset('car.master')!
+const asset = getAsset('gridlock-car-dev')!
 const TABS = ['OVERVIEW', 'FORM', 'FANTASY', 'CAR'] as const
 type Tab = typeof TABS[number]
 

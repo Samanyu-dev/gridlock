@@ -3,7 +3,7 @@ import { GLShowroom, ModelViewer, CameraRig, LightingRig, EnvironmentRig } from 
 import type { InteractionState } from '../../components/gl3d'
 import { getAsset } from '../../lib/gl3d/manifest'
 
-const asset = getAsset('car.master')!
+const asset = getAsset('gridlock-car-dev')!
 
 /** The homepage's cinematic reveal: the car sits nose-on in near darkness,
  * a light sweep brings it up over ~1.6s while the camera settles into the

@@ -37,8 +37,8 @@ export interface GL3DAsset {
 }
 
 export const GL3D_MANIFEST: Record<string, GL3DAsset> = {
-  'car.master': {
-    id: 'car.master',
+  'gridlock-car-dev': {
+    id: 'gridlock-car-dev',
     type: 'car',
     model: {
       high: '/models/cars/gridlock-master-car/high.glb',

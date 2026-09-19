@@ -6,7 +6,7 @@ import type { CameraPreset, InteractionState } from '../../components/gl3d'
 import { getAsset } from '../../lib/gl3d/manifest'
 
 const PRESETS: CameraPreset[] = ['HERO', 'FRONT', 'SIDE', 'REAR', 'TOP', 'COCKPIT']
-const asset = getAsset('car.master')!
+const asset = getAsset('gridlock-car-dev')!
 
 export default function CarShowroom() {
   const [preset, setPreset] = useState<CameraPreset>('HERO')
