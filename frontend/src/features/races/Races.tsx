@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Countdown } from '../../components/motion'
-import { Skeleton } from '../../components/bits'
+import { Skeleton, SprintBadge } from '../../components/bits'
 import { api } from '../../lib/api'
 import { flagEmoji, localDateFull } from '../../lib/format'
 import type { Race } from '../../lib/types'
@@ -27,7 +27,7 @@ export default function Races() {
                   <div>
                     <div className="row gap-2">
                       <span style={{ fontWeight: 700, fontSize: 17 }}>{flagEmoji(r.country)} {r.name}</span>
-                      {r.is_sprint && <span className="chip" style={{ padding: '1px 6px', color: 'var(--caution)' }}>SPRINT</span>}
+                      {r.is_sprint && <SprintBadge />}
                     </div>
                     <span className="eyebrow">{r.circuit} · {localDateFull(r.race_start)}</span>
                   </div>

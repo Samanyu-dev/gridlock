@@ -262,6 +262,8 @@ def _race_full(r) -> dict:
         "sessions": [{"kind": x.kind, "label": x.label, "start": _iso(x.start)} for x in r.sessions],
         "classification": r.classification,
         "quali": r.quali,
+        "sprint_classification": r.sprint_classification,
+        "sprint_quali": r.sprint_quali,
         "fastest_lap": {"name": fl.name, "short": fl.short} if fl else None,
         "dotd": {"name": dotd.name, "short": dotd.short} if dotd else None,
     }

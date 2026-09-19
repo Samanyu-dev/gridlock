@@ -22,7 +22,7 @@ from .scoring import (
 from .season import (
     CONSTRUCTOR_DEFS, DRIVER_DEFS,
     Constructor, Driver, Race, RaceSession, Season,
-    _car_image, _driver_image, _finalize_metrics, _logo_image, _slugify,
+    _car_image, _driver_image, _finalize_metrics, _logo_image, _quali_rows, _slugify,
 )
 
 UTC = timezone.utc
@@ -191,10 +191,21 @@ def _fetch_weekend(client, weekend: List[dict], race_sess: dict) -> dict:
         sprint_results = {r.get("driver_number"): r for r in client.session_result(session_key=skey2)}
         sprint_grid = {g.get("driver_number"): g.get("position") for g in client.starting_grid(session_key=skey2)}
 
+    # Sprint qualifying (aka Sprint Shootout in some seasons) sets the sprint
+    # grid — its own session, distinct from both "Sprint" and "Qualifying".
+    sprint_quali_sess = next(
+        (s for s in weekend if "sprint" in (s.get("session_name") or "").lower()
+         and "quali" in (s.get("session_name") or "").lower()), None,
+    )
+    sprint_quali: Dict[int, int] = {}
+    if sprint_quali_sess:
+        for q in client.session_result(session_key=sprint_quali_sess.get("session_key")):
+            sprint_quali[q.get("driver_number")] = q.get("position")
+
     return {
         "results": results, "grid": grid, "quali": quali, "has_results": has_results,
         "fl": fl, "pits": pits, "weather": weather,
-        "sprint_results": sprint_results, "sprint_grid": sprint_grid,
+        "sprint_results": sprint_results, "sprint_grid": sprint_grid, "sprint_quali": sprint_quali,
     }
 
 
@@ -264,6 +275,7 @@ def normalize_season(client, year: int) -> Optional[Season]:
         results, grid, quali = data["results"], data["grid"], data["quali"]
         has_results, fl, pits = data["has_results"], data["fl"], data["pits"]
         sprint_results, sprint_grid = data["sprint_results"], data["sprint_grid"]
+        sprint_quali = data["sprint_quali"]
 
         # Only score drivers OpenF1 actually reports a result row for this
         # weekend — a missing row means missing data, not a DNS penalty.
@@ -337,6 +349,9 @@ def normalize_season(client, year: int) -> Optional[Season]:
             sessions=[RaceSession("RACE", "Grand Prix", start)],
             winner_id=_winner(dr), fastest_lap_id=fl,
             classification=_classification(dr, drivers, constructors) if has_results else [],
+            quali=_quali_rows(quali, drivers, constructors) if quali else [],
+            sprint_classification=_classification(sprint_dr, drivers, constructors) if sprint_dr and has_results else [],
+            sprint_quali=_quali_rows(sprint_quali, drivers, constructors) if sprint_quali else [],
             circuit_image_url=meeting.get("circuit_image") or "",
         ))
 

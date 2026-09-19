@@ -224,6 +224,8 @@ class Race:
     dotd_id: Optional[int] = None
     classification: List[dict] = field(default_factory=list)
     quali: List[dict] = field(default_factory=list)
+    sprint_classification: List[dict] = field(default_factory=list)
+    sprint_quali: List[dict] = field(default_factory=list)
     circuit_image_url: str = ""
 
 
@@ -335,6 +337,47 @@ def _simulate_round(rnd: int, drivers: List[Driver], constructors: Dict[int, Con
 
     is_sprint = CIRCUIT_DEFS[rnd - 1][6]
 
+    # Sprint weekend: its own independent quali + short race, simulated the
+    # same way as the main sessions so the sprint UI has real data to show —
+    # never faked separately from how the rest of the season is generated.
+    sprint_quali_order: Dict[int, int] = {}
+    sprint_driver_results: Dict[int, DriverRaceResult] = {}
+    if is_sprint:
+        sq_scores = []
+        for d in drivers:
+            s = strength(d) + rng.gauss(0, 5.5)
+            sq_scores.append((d, s))
+        sq_scores.sort(key=lambda t: t[1], reverse=True)
+        sprint_quali_order = {d.id: i + 1 for i, (d, _) in enumerate(sq_scores)}
+
+        sprint_dnf_ids = set()
+        for d in drivers:
+            c = constructors[d.constructor_id]
+            fail = (1.0 - c.reliability) * 0.12 + 0.01  # shorter race, fewer DNFs
+            if rng.random() < fail:
+                sprint_dnf_ids.add(d.id)
+
+        sprint_scores = []
+        for d in drivers:
+            if d.id in sprint_dnf_ids:
+                continue
+            s = strength(d) + rng.gauss(0, 6.0) - sprint_quali_order[d.id] * 0.12
+            sprint_scores.append((d, s))
+        sprint_scores.sort(key=lambda t: t[1], reverse=True)
+        sprint_finish_order = {d.id: i + 1 for i, (d, _) in enumerate(sprint_scores)}
+
+        for d in drivers:
+            if d.id in sprint_dnf_ids:
+                status, finish = DNF, None
+            else:
+                pos = sprint_finish_order[d.id]
+                status = FINISHED if pos <= 16 else CLASSIFIED
+                finish = pos
+            sprint_driver_results[d.id] = DriverRaceResult(
+                driver_id=d.id, grid=sprint_quali_order[d.id], finish=finish, status=status,
+                fastest_lap=False, quali_position=sprint_quali_order[d.id], is_sprint=True,
+            )
+
     driver_results: Dict[int, DriverRaceResult] = {}
     for d in drivers:
         if d.id in dnf_ids:
@@ -372,6 +415,8 @@ def _simulate_round(rnd: int, drivers: List[Driver], constructors: Dict[int, Con
         "dnf_ids": dnf_ids,
         "penalized": penalized,
         "is_sprint": is_sprint,
+        "sprint_quali_order": sprint_quali_order,
+        "sprint_driver_results": sprint_driver_results,
     }
     return driver_results, constructor_results, meta
 
@@ -474,12 +519,18 @@ def build_season(now: Optional[datetime] = None) -> Season:
         race.fastest_lap_id = meta["fastest_lap_id"]
         race.dotd_id = meta["dotd_id"]
 
+        sprint_dr = meta["sprint_driver_results"]
         for did, result in dr.items():
             bd = engine.score_driver(result, teammate=_teammate_result(did, drivers, dr))
+            total, items = bd.total, list(bd.items)
+            if did in sprint_dr:
+                sbd = engine.score_driver(sprint_dr[did], teammate=_teammate_result(did, drivers, sprint_dr))
+                total += sbd.total
+                items += sbd.items
             d = drivers[did]
-            d.points += bd.total
-            d.round_points[race.round] = bd.total
-            d.round_breakdown[race.round] = bd.items
+            d.points += total
+            d.round_points[race.round] = total
+            d.round_breakdown[race.round] = items
             d.results[race.round] = {
                 "grid": result.grid,
                 "finish": result.finish,
@@ -499,6 +550,9 @@ def build_season(now: Optional[datetime] = None) -> Season:
         # Build race classification + quali tables for the race detail page.
         race.classification = _classification_rows(dr, drivers, constructors, meta["dotd_id"])
         race.quali = _quali_rows(meta["quali_order"], drivers, constructors)
+        if race.is_sprint and sprint_dr:
+            race.sprint_classification = _classification_rows(sprint_dr, drivers, constructors)
+            race.sprint_quali = _quali_rows(meta["sprint_quali_order"], drivers, constructors)
 
     _finalize_metrics(drivers, constructors)
     return Season(

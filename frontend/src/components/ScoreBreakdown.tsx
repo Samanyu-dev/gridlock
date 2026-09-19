@@ -1,6 +1,24 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import type { WeekendScore } from '../lib/types'
+import type { LedgerEntry, WeekendScore } from '../lib/types'
+
+const PHASE_ORDER = ['quali', 'sprint', 'race', 'constructor', 'bonus']
+const PHASE_LABEL: Record<string, string> = {
+  quali: 'Qualifying', sprint: 'Sprint', race: 'Race', constructor: 'Constructor', bonus: 'Bonus',
+}
+
+/** Groups a flat ledger into phase sections (Qualifying/Sprint/Race/Bonus) so
+ *  sprint weekends — which mix all four phases in one asset's ledger — read
+ *  as a clear breakdown instead of an undifferentiated list. */
+function groupByPhase(entries: LedgerEntry[]): { phase: string; entries: LedgerEntry[] }[] {
+  const groups = new Map<string, LedgerEntry[]>()
+  for (const e of entries) {
+    const key = PHASE_ORDER.includes(e.phase) ? e.phase : 'bonus'
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(e)
+  }
+  return PHASE_ORDER.filter((p) => groups.has(p)).map((phase) => ({ phase, entries: groups.get(phase)! }))
+}
 
 const STATE_META: Record<string, { label: string; color: string; note: string }> = {
   live: { label: 'LIVE', color: 'var(--red)', note: 'Provisional — updating from timing' },
@@ -49,17 +67,27 @@ export function ScoreBreakdown({ weekend }: { weekend: WeekendScore }) {
                 </span>
                 <span className="num" style={{ fontWeight: 800, color: a.subtotal >= 0 ? 'var(--text)' : 'var(--loss)' }}>{a.subtotal}</span>
               </button>
-              {isOpen && (
-                <div style={{ padding: '4px 14px 12px 30px' }}>
-                  {a.entries.length === 0 && <span className="text-faint" style={{ fontSize: 12 }}>No scoring events this round.</span>}
-                  {a.entries.map((e, i) => (
-                    <div key={i} className="row between" style={{ padding: '4px 0', fontSize: 13 }}>
-                      <span className="text-dim">{e.label}</span>
-                      <span className="num" style={{ fontWeight: 700, color: e.points >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{e.points >= 0 ? '+' : ''}{e.points}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {isOpen && (() => {
+                const groups = groupByPhase(a.entries)
+                return (
+                  <div style={{ padding: '4px 14px 12px 30px' }}>
+                    {a.entries.length === 0 && <span className="text-faint" style={{ fontSize: 12 }}>No scoring events this round.</span>}
+                    {groups.map((g) => (
+                      <div key={g.phase} style={{ marginTop: 6 }}>
+                        {groups.length > 1 && (
+                          <span className="eyebrow" style={{ fontSize: 10, color: g.phase === 'sprint' ? 'var(--caution)' : undefined }}>{PHASE_LABEL[g.phase]}</span>
+                        )}
+                        {g.entries.map((e, i) => (
+                          <div key={i} className="row between" style={{ padding: '4px 0', fontSize: 13 }}>
+                            <span className="text-dim">{e.label}</span>
+                            <span className="num" style={{ fontWeight: 700, color: e.points >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{e.points >= 0 ? '+' : ''}{e.points}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           )
         })}

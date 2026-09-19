@@ -58,10 +58,13 @@ export interface Race {
   circuit_image_url: string; round_state: 'UPCOMING' | 'OPEN' | 'LOCKED' | 'LIVE' | 'PROVISIONAL' | 'FINAL'
   winner: { name: string; short: string } | null
 }
+export interface QualiRow { driver_id: number; name: string; short: string; constructor: string; color: string; position: number }
 export interface RaceFull extends Race {
   sessions: RaceSession[]
   classification: ClassificationRow[]
-  quali: { driver_id: number; name: string; short: string; constructor: string; color: string; position: number }[]
+  quali: QualiRow[]
+  sprint_classification: ClassificationRow[]
+  sprint_quali: QualiRow[]
   fastest_lap: { name: string; short: string } | null
   dotd: { name: string; short: string } | null
 }

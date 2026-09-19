@@ -1,6 +1,18 @@
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Minus, Zap } from 'lucide-react'
 import { initials } from '../lib/format'
+
+/** Consistent sprint-weekend visual identity — one badge used everywhere a
+ *  race is flagged as a sprint weekend, instead of ad-hoc inline chips. */
+export function SprintBadge({ size = 'sm' }: { size?: 'sm' | 'md' }) {
+  const pad = size === 'md' ? '3px 9px' : '1px 7px'
+  const fontSize = size === 'md' ? 13 : 11
+  return (
+    <span className="chip" style={{ padding: pad, fontSize, color: 'var(--caution)', borderColor: 'var(--caution)', gap: 4 }}>
+      <Zap size={size === 'md' ? 13 : 11} /> SPRINT
+    </span>
+  )
+}
 
 /** Driver headshot when `image` is given (falls back to a team-colored
  *  monogram with car number if there's no image, or it fails to load). */

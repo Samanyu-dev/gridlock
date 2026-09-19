@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, Radio, Users, Swords } from 'lucide-react'
 import { Countdown } from '../../components/motion'
-import { Skeleton } from '../../components/bits'
+import { Skeleton, SprintBadge } from '../../components/bits'
 import { StateBadge } from '../../components/ScoreBreakdown'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
@@ -20,7 +20,7 @@ export default function Live() {
   const [round, setRound] = useState<LeaderboardRow[]>([])
   const [league, setLeague] = useState<LeagueDetail | null>(null)
   const [ownership, setOwnership] = useState<OwnershipReport | null>(null)
-  const [tab, setTab] = useState<'quali' | 'race'>('quali')
+  const [tab, setTab] = useState<'quali' | 'race' | 'sprint_quali' | 'sprint'>('quali')
   const [showFull, setShowFull] = useState(false)
   const [rival, setRival] = useState('')
   const [battle, setBattle] = useState<LiveBattleReport | null>(null)
@@ -82,8 +82,8 @@ export default function Live() {
             <div className="row gap-3">
               {state === 'LIVE' && <span className="chip chip-live" style={{ fontSize: 13 }}><span className="dot" />LIVE</span>}
               <div>
-                <h1 className="display" style={{ fontSize: 30 }}>{flagEmoji(nr?.country)} {nr?.name ?? 'Season complete'}</h1>
-                <span className="text-dim">{nr?.circuit}{nr?.is_sprint ? ' · Sprint weekend' : ''} · {nr?.weather}</span>
+                <h1 className="display row gap-2" style={{ fontSize: 30, alignItems: 'center' }}>{flagEmoji(nr?.country)} {nr?.name ?? 'Season complete'}{nr?.is_sprint && <SprintBadge size="md" />}</h1>
+                <span className="text-dim">{nr?.circuit} · {nr?.weather}</span>
               </div>
             </div>
             <div className="col" style={{ alignItems: 'flex-end' }}>
@@ -191,56 +191,62 @@ export default function Live() {
               </div>
             )}
 
-            {/* Session tabs: qualifying / race classification */}
-            {race && (
-              <div className="panel" style={{ overflow: 'hidden' }}>
-                <div className="row" style={{ padding: 12, borderBottom: '1px solid var(--line)' }}>
-                  <div className="seg">
-                    <button className={tab === 'quali' ? 'active' : ''} onClick={() => setTab('quali')}>Qualifying</button>
-                    <button className={tab === 'race' ? 'active' : ''} onClick={() => setTab('race')}>Race</button>
+            {/* Session tabs: qualifying / sprint / race classification */}
+            {race && (() => {
+              const isQualiTab = tab === 'quali' || tab === 'sprint_quali'
+              const rows = tab === 'quali' ? race.quali : tab === 'sprint_quali' ? race.sprint_quali : tab === 'sprint' ? race.sprint_classification : race.classification
+              return (
+                <div className="panel" style={{ overflow: 'hidden' }}>
+                  <div className="row" style={{ padding: 12, borderBottom: '1px solid var(--line)' }}>
+                    <div className="seg" style={{ flexWrap: 'wrap' }}>
+                      {race.is_sprint && <button className={tab === 'sprint_quali' ? 'active' : ''} onClick={() => setTab('sprint_quali')}>Sprint Grid</button>}
+                      {race.is_sprint && <button className={tab === 'sprint' ? 'active' : ''} onClick={() => setTab('sprint')}>Sprint</button>}
+                      <button className={tab === 'quali' ? 'active' : ''} onClick={() => setTab('quali')}>Qualifying</button>
+                      <button className={tab === 'race' ? 'active' : ''} onClick={() => setTab('race')}>Race</button>
+                    </div>
                   </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="tower">
+                      {isQualiTab ? (
+                        <>
+                          <thead><tr><th>P</th><th>Driver</th><th className="hide-mobile">Team</th></tr></thead>
+                          <tbody>
+                            {rows.length === 0 && <tr><td colSpan={3} className="text-faint" style={{ padding: 16 }}>No data yet.</td></tr>}
+                            {(rows as typeof race.quali).slice(0, showFull ? undefined : 5).map((q) => (
+                              <tr key={q.driver_id}>
+                                <td><span className="pos">{String(q.position).padStart(2, '0')}</span></td>
+                                <td><span className="row gap-2"><span className="team-dot" style={{ background: q.color, height: 16 }} />{q.name}</span></td>
+                                <td className="hide-mobile text-dim">{q.constructor}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </>
+                      ) : (
+                        <>
+                          <thead><tr><th>P</th><th>Driver</th><th className="hide-mobile">Team</th><th className="r">Δ</th></tr></thead>
+                          <tbody>
+                            {rows.length === 0 && <tr><td colSpan={4} className="text-faint" style={{ padding: 16 }}>No data yet.</td></tr>}
+                            {(rows as typeof race.classification).slice(0, showFull ? undefined : 5).map((c) => (
+                              <tr key={c.driver_id}>
+                                <td><span className="pos">{c.finish ? String(c.finish).padStart(2, '0') : '—'}</span></td>
+                                <td><span className="row gap-2"><span className="team-dot" style={{ background: c.color, height: 16 }} />{c.name}{c.fastest_lap && <span className="tag-pts tag-fl">FL</span>}</span></td>
+                                <td className="hide-mobile text-dim">{c.constructor}</td>
+                                <td className="r">{c.delta != null && <span className="delta" style={{ color: c.delta > 0 ? 'var(--gain)' : c.delta < 0 ? 'var(--loss)' : 'var(--text-faint)' }}>{c.delta > 0 ? `+${c.delta}` : c.delta}</span>}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </>
+                      )}
+                    </table>
+                  </div>
+                  {rows.length > 5 && (
+                    <button className="row center gap-2" style={{ width: '100%', padding: 10, background: 'transparent', border: 'none', color: 'var(--text-faint)', borderTop: '1px solid var(--line-soft)' }} onClick={() => setShowFull((v) => !v)}>
+                      {showFull ? 'Show less' : 'Show full classification'} <ChevronDown size={14} style={{ transform: showFull ? 'rotate(180deg)' : 'none' }} />
+                    </button>
+                  )}
                 </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="tower">
-                    {tab === 'quali' ? (
-                      <>
-                        <thead><tr><th>P</th><th>Driver</th><th className="hide-mobile">Team</th></tr></thead>
-                        <tbody>
-                          {race.quali.length === 0 && <tr><td colSpan={3} className="text-faint" style={{ padding: 16 }}>No qualifying data yet.</td></tr>}
-                          {race.quali.slice(0, showFull ? undefined : 5).map((q) => (
-                            <tr key={q.driver_id}>
-                              <td><span className="pos">{String(q.position).padStart(2, '0')}</span></td>
-                              <td><span className="row gap-2"><span className="team-dot" style={{ background: q.color, height: 16 }} />{q.name}</span></td>
-                              <td className="hide-mobile text-dim">{q.constructor}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </>
-                    ) : (
-                      <>
-                        <thead><tr><th>P</th><th>Driver</th><th className="hide-mobile">Team</th><th className="r">Δ</th></tr></thead>
-                        <tbody>
-                          {race.classification.length === 0 && <tr><td colSpan={4} className="text-faint" style={{ padding: 16 }}>No race data yet.</td></tr>}
-                          {race.classification.slice(0, showFull ? undefined : 5).map((c) => (
-                            <tr key={c.driver_id}>
-                              <td><span className="pos">{c.finish ? String(c.finish).padStart(2, '0') : '—'}</span></td>
-                              <td><span className="row gap-2"><span className="team-dot" style={{ background: c.color, height: 16 }} />{c.name}{c.fastest_lap && <span className="tag-pts tag-fl">FL</span>}</span></td>
-                              <td className="hide-mobile text-dim">{c.constructor}</td>
-                              <td className="r">{c.delta != null && <span className="delta" style={{ color: c.delta > 0 ? 'var(--gain)' : c.delta < 0 ? 'var(--loss)' : 'var(--text-faint)' }}>{c.delta > 0 ? `+${c.delta}` : c.delta}</span>}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </>
-                    )}
-                  </table>
-                </div>
-                {(race.quali.length > 5 || race.classification.length > 5) && (
-                  <button className="row center gap-2" style={{ width: '100%', padding: 10, background: 'transparent', border: 'none', color: 'var(--text-faint)', borderTop: '1px solid var(--line-soft)' }} onClick={() => setShowFull((v) => !v)}>
-                    {showFull ? 'Show less' : 'Show full classification'} <ChevronDown size={14} style={{ transform: showFull ? 'rotate(180deg)' : 'none' }} />
-                  </button>
-                )}
-              </div>
-            )}
+              )
+            })()}
           </div>
 
           <div className="col gap-3">

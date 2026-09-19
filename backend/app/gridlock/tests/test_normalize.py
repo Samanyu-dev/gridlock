@@ -109,17 +109,24 @@ def test_normalize_season_end_to_end_with_fixtures():
     # drivers with no result row this round (everyone else) are simply DNS,
     # never invented — no points, no crash.
     assert season.drivers[16].points == 0
+    # The race-wide qualifying classification table is populated (not just
+    # each driver's own quali position) — this used to be silently empty.
+    assert len(season.races[0].quali) == 2
+    assert {row["driver_id"] for row in season.races[0].quali} == {1, 44}
 
 
 class _FakeSprintClient(_FakeClient):
-    """Same fixture weekend, but with a Sprint session too."""
+    """Same fixture weekend, but with a Sprint (and Sprint Qualifying) session."""
     def sessions(self, **p):
         return super().sessions(**p) + [
             {"session_key": 88, "meeting_key": 10, "session_name": "Sprint"},
+            {"session_key": 87, "meeting_key": 10, "session_name": "Sprint Qualifying"},
         ]
     def session_result(self, **p):
         if p.get("session_key") == 88:  # sprint: driver 44 beats driver 1
             return [{"driver_number": 44, "position": 1}, {"driver_number": 1, "position": 2}]
+        if p.get("session_key") == 87:  # sprint quali: driver 1 on pole
+            return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}]
         return super().session_result(**p)
     def starting_grid(self, **p):
         if p.get("session_key") == 88:
@@ -136,3 +143,16 @@ def test_normalize_season_adds_sprint_points_on_top_of_race():
     assert with_sprint.drivers[44].points > race_only.drivers[44].points
     labels = [e["label"] for e in with_sprint.drivers[44].round_breakdown[1]]
     assert any("Sprint" in label for label in labels)
+
+    # Sprint classification/grid tables are exposed distinctly from the main
+    # race's, sourced from the sprint's own sessions — not fabricated.
+    race = with_sprint.races[0]
+    assert len(race.sprint_classification) == 2
+    winner = next(r for r in race.sprint_classification if r["finish"] == 1)
+    assert winner["driver_id"] == 44
+    assert len(race.sprint_quali) == 2
+    pole = next(r for r in race.sprint_quali if r["position"] == 1)
+    assert pole["driver_id"] == 1
+    # A non-sprint weekend never gets sprint tables.
+    assert race_only.races[0].sprint_classification == []
+    assert race_only.races[0].sprint_quali == []
