@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, Radio, Users, Swords } from 'lucide-react'
 import { Countdown } from '../../components/motion'
@@ -8,9 +8,19 @@ import { StateBadge } from '../../components/ScoreBreakdown'
 import { api } from '../../lib/api'
 import { flagEmoji } from '../../lib/format'
 import { useSession } from '../../lib/session'
+import { getCircuitAsset } from '../../lib/gl3d/circuitManifest'
 import type { LeaderboardRow, LeagueDetail, LiveBattleReport, Meta, MeResponse, OptimalTeamReport, OwnershipReport, RaceFull, WeekendScore } from '../../lib/types'
 
 const DIFFERENTIAL_THRESHOLD = 20
+
+// Same nested-lazy pattern as the circuit page: only fetch the 3D chunk
+// when this round's circuit actually has a manifest asset.
+const CircuitStage3D = lazy(() => import('../../components/gl3d').then((m) => ({ default: m.CircuitStage })))
+const CIRCUIT_ASSET_BY_NAME: Record<string, string> = {
+  'Circuit de Monaco': 'monaco',
+  'Silverstone Circuit': 'silverstone',
+  'Circuit de Spa-Francorchamps': 'spa-francorchamps',
+}
 
 export default function Live() {
   const { authed } = useSession()
@@ -73,6 +83,8 @@ export default function Live() {
   const isSettled = state === 'PROVISIONAL' || state === 'FINAL'
   const captain = me?.team?.captain_id
   const underdog = me?.team?.active_boost === 'underdog' ? me.team.boost_driver_id : null
+  const circuitAssetSlug = nr ? CIRCUIT_ASSET_BY_NAME[nr.circuit] : undefined
+  const circuitAsset = circuitAssetSlug ? getCircuitAsset(circuitAssetSlug) : undefined
 
   return (
     <div className="page">
@@ -266,6 +278,22 @@ export default function Live() {
           </div>
 
           <div className="col gap-3">
+            {/* Circuit overview — only for circuits with a 3D asset so far */}
+            {circuitAsset && (
+              <div className="panel" style={{ overflow: 'hidden' }}>
+                <div style={{ height: 220, position: 'relative' }}>
+                  <Suspense fallback={<div style={{ height: '100%', background: '#05060a' }} />}>
+                    <CircuitStage3D asset={circuitAsset} preset="TOP" detail="compact" interactive={false} />
+                  </Suspense>
+                  <span className="chip" style={{ position: 'absolute', top: 10, left: 10, color: 'var(--red)', borderColor: 'var(--red)' }}>{state}</span>
+                </div>
+                <div className="row between" style={{ padding: '8px 14px' }}>
+                  <span className="eyebrow">{nr?.circuit}</span>
+                  <Link to={`/circuits/${nr?.slug}`} className="eyebrow">Full circuit →</Link>
+                </div>
+              </div>
+            )}
+
             {/* This round's biggest movers */}
             {round.length > 0 && (
               <div className="panel panel-pad">

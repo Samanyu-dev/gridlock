@@ -21,12 +21,13 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
-        // The 3D engine chunk and car models are only fetched by pages that
-        // actually mount a <GLShowroom> — precaching them for every visitor
-        // would force a ~1MB background download on first load for people
-        // who never open a 3D page. They're still cached, just lazily (on
+        // The 3D engine chunk, car models, circuit data chunk, and circuit
+        // fallback SVGs are only fetched by pages that actually mount a
+        // <GLShowroom>/<CircuitStage> — precaching them for every visitor
+        // would force a multi-MB background download on first load for
+        // people who never open a 3D page. Still cached, just lazily (on
         // first real request) via the runtimeCaching rules below.
-        globIgnores: ['**/gl3d-*.js', '**/models/**'],
+        globIgnores: ['**/gl3d-*.js', '**/circuitManifest-*.js', '**/models/**', '**/circuits/*.svg'],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
@@ -39,11 +40,12 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ url }) => url.pathname.includes('/gl3d-') || url.pathname.startsWith('/models/'),
+            urlPattern: ({ url }) => url.pathname.includes('/gl3d-') || url.pathname.includes('/circuitManifest-')
+              || url.pathname.startsWith('/models/') || (url.pathname.startsWith('/circuits/') && url.pathname.endsWith('.svg')),
             handler: 'CacheFirst',
             options: {
               cacheName: 'gridlock-3d',
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

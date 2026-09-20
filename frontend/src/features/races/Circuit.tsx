@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, TrendingUp } from 'lucide-react'
 import { Countdown } from '../../components/motion'
@@ -6,7 +6,23 @@ import { CircuitTrace } from './CircuitTrace'
 import { Skeleton, SprintBadge } from '../../components/bits'
 import { api } from '../../lib/api'
 import { flagEmoji, localTime, localWeekday, userTimezone } from '../../lib/format'
+import { getCircuitAsset } from '../../lib/gl3d/circuitManifest'
 import type { Driver, Constructor, RaceFull } from '../../lib/types'
+
+// three.js/R3F only loads when this circuit actually has a 3D asset — most
+// circuits don't yet (only 3 are converted so far), so this stays a nested
+// lazy import rather than a top-level one.
+const CircuitStage3D = lazy(() => import('../../components/gl3d').then((m) => ({ default: m.CircuitStage })))
+
+// The race's free-text circuit name matches the manifest asset's `name`
+// exactly (both come from the same real-world circuit identity) — a small
+// explicit lookup rather than fuzzy matching, since only 3 circuits exist
+// in the manifest so far.
+const CIRCUIT_ASSET_BY_NAME: Record<string, string> = {
+  'Circuit de Monaco': 'monaco',
+  'Silverstone Circuit': 'silverstone',
+  'Circuit de Spa-Francorchamps': 'spa-francorchamps',
+}
 
 export default function Circuit() {
   const { slug } = useParams()
@@ -23,6 +39,8 @@ export default function Circuit() {
   if (!r) return <div className="page container"><Skeleton h={220} /></div>
   const done = r.status === 'completed'
   const podium = r.classification.filter((c) => c.finish && c.finish <= 3)
+  const circuitAssetSlug = CIRCUIT_ASSET_BY_NAME[r.circuit]
+  const circuitAsset = circuitAssetSlug ? getCircuitAsset(circuitAssetSlug) : undefined
 
   return (
     <div className="page">
@@ -30,18 +48,33 @@ export default function Circuit() {
         <Link to="/races" className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }}><ArrowLeft size={15} /> Calendar</Link>
 
         <div className="panel" style={{ overflow: 'hidden', marginBottom: 20 }}>
-          <div className="row between wrap" style={{ padding: 28 }}>
-            <div>
-              <span className="eyebrow row gap-2" style={{ alignItems: 'center' }}>{flagEmoji(r.country)} {r.country_name}{r.is_sprint && <SprintBadge />}</span>
-              <h1 className="display" style={{ fontSize: 'clamp(30px,5vw,54px)', margin: '4px 0' }}>{r.circuit}</h1>
-              <span className="text-dim">Host of Round {r.round} · {r.name}</span>
+          {circuitAsset ? (
+            <div style={{ height: 340, position: 'relative' }}>
+              <Suspense fallback={<div style={{ height: '100%', background: '#05060a' }} />}>
+                <CircuitStage3D asset={circuitAsset} preset="HERO" detail="full" />
+              </Suspense>
+              <div className="row between" style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: 20, background: 'linear-gradient(180deg, rgba(5,6,10,.75), transparent)' }}>
+                <span className="eyebrow row gap-2" style={{ alignItems: 'center', color: '#fff' }}>{flagEmoji(r.country)} {r.country_name}{r.is_sprint && <SprintBadge />}</span>
+              </div>
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, background: 'linear-gradient(0deg, rgba(5,6,10,.85), transparent)' }}>
+                <h1 className="display" style={{ fontSize: 'clamp(28px,4.5vw,48px)', margin: 0, color: '#fff' }}>{r.circuit}</h1>
+                <span style={{ color: 'var(--text-dim)' }}>Host of Round {r.round} · {r.name} · drag to orbit, scroll to zoom</span>
+              </div>
             </div>
-            <div style={{ width: 260, height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {r.circuit_image_url
-                ? <img src={r.circuit_image_url} alt={r.circuit} style={{ height: '100%', maxWidth: '100%', objectFit: 'contain' }} />
-                : <CircuitTrace seed={r.slug} height={150} />}
+          ) : (
+            <div className="row between wrap" style={{ padding: 28 }}>
+              <div>
+                <span className="eyebrow row gap-2" style={{ alignItems: 'center' }}>{flagEmoji(r.country)} {r.country_name}{r.is_sprint && <SprintBadge />}</span>
+                <h1 className="display" style={{ fontSize: 'clamp(30px,5vw,54px)', margin: '4px 0' }}>{r.circuit}</h1>
+                <span className="text-dim">Host of Round {r.round} · {r.name}</span>
+              </div>
+              <div style={{ width: 260, height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {r.circuit_image_url
+                  ? <img src={r.circuit_image_url} alt={r.circuit} style={{ height: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                  : <CircuitTrace seed={r.slug} height={150} />}
+              </div>
             </div>
-          </div>
+          )}
           {!done && (
             <div className="row between wrap gap-2" style={{ padding: '16px 28px', borderTop: '1px solid var(--line)', background: 'var(--surface-2)' }}>
               <span className="eyebrow">Fantasy deadline · {userTimezone()}</span>

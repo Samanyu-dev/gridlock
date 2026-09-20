@@ -5,9 +5,9 @@ import type { InteractionState } from './InteractionController'
 
 export type CameraPreset = 'HIDDEN' | 'HERO' | 'FRONT' | 'SIDE' | 'REAR' | 'TOP' | 'COCKPIT' | 'SPOTLIGHT'
 
-interface PresetSpec { position: [number, number, number]; target: [number, number, number]; fov: number }
+export interface CameraPresetSpec { position: [number, number, number]; target: [number, number, number]; fov: number }
 
-export const CAMERA_PRESETS: Record<CameraPreset, PresetSpec> = {
+export const CAMERA_PRESETS: Record<CameraPreset, CameraPresetSpec> = {
   // Tight, low, dark framing on the nose — the homepage hero's pre-reveal
   // state. Not one of the showroom's six named views; a shared preset since
   // it's just another camera position, not a bespoke camera system.
@@ -23,7 +23,10 @@ export const CAMERA_PRESETS: Record<CameraPreset, PresetSpec> = {
 }
 
 interface CameraRigProps {
-  preset: CameraPreset
+  /** Either a named car preset (looked up in CAMERA_PRESETS) or a raw spec
+   * — circuits, and anything else with its own preset vocabulary, pass a
+   * spec object directly instead of adding entries to the car's dictionary. */
+  preset: CameraPreset | CameraPresetSpec
   lerpSpeed?: number
   interaction?: React.RefObject<InteractionState>
   /** Normalized (-1..1) continuous input for scroll-linked camera drift —
@@ -33,18 +36,24 @@ interface CameraRigProps {
   scrollShift?: number
 }
 
-/** Damped camera transitions between named presets — the same rig used by
- * the showroom, the driver page's tab switches, the homepage's reveal
- * sequence, and (later) the garage. Lives inside <Canvas>; mount once per
- * scene. */
+function resolveSpec(preset: CameraPreset | CameraPresetSpec): CameraPresetSpec {
+  return typeof preset === 'string' ? CAMERA_PRESETS[preset] : preset
+}
+
+/** Damped camera transitions between presets — the same rig used by the car
+ * showroom, the driver page's tab switches, the homepage's reveal sequence,
+ * the garage, and the circuit scenes (which pass their own top-down/hero/
+ * follow specs rather than car preset names). Lives inside <Canvas>; mount
+ * once per scene. */
 export function CameraRig({ preset, lerpSpeed = 4, interaction, scrollShift = 0 }: CameraRigProps) {
   const { camera } = useThree()
-  const target = useRef(new Vector3(...CAMERA_PRESETS[preset].target))
-  const currentTarget = useRef(new Vector3(...CAMERA_PRESETS[preset].target))
-  const desiredFov = useRef(CAMERA_PRESETS[preset].fov)
+  const initial = resolveSpec(preset)
+  const target = useRef(new Vector3(...initial.position))
+  const currentTarget = useRef(new Vector3(...initial.target))
+  const desiredFov = useRef(initial.fov)
 
   useFrame((_, delta) => {
-    const spec = CAMERA_PRESETS[preset]
+    const spec = resolveSpec(preset)
     const zoom = interaction?.current.zoom ?? 1
     const parX = interaction?.current.parallaxX ?? 0
     const parY = interaction?.current.parallaxY ?? 0

@@ -1,0 +1,16 @@
+Source: bacinger/f1-circuits — https://github.com/bacinger/f1-circuits
+License: MIT (Copyright (c) 2019-2025 Tomislav Bacinger)
+Files: monaco.geojson (circuits/mc-1929.geojson), silverstone.geojson
+(circuits/gb-1948.geojson), spa.geojson (circuits/be-1925.geojson) —
+fetched via the GitHub contents API on 2026-09-20.
+
+These are real, surveyed/traced track outlines (lon/lat LineStrings), not
+hand-drawn approximations. build-circuit-asset.mjs (in the parent
+directory) projects them to local meters, resamples to an even point
+spacing, and detects corners from real curvature — nothing about the
+track shape is eyeballed.
+
+No per-point elevation data exists in this source (only a single
+altitude figure near start/finish), so every generated circuit's Y is 0.
+Flat is the honest state of the data, not a placeholder for a fake
+profile.
