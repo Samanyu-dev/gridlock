@@ -58,7 +58,10 @@ class JolpicaClient:
                     'location':r['Circuit']['Location']['locality']})
         return rows
 
-    def session_result(self, session_key):
+    def session_result(self, session_key, ttl=None):
+        # No per-call HTTP caching here (the whole season is fetched once in
+        # __init__), so `ttl` — needed only for OpenF1Client's cache — is
+        # accepted and ignored to keep normalize.py's calls provider-agnostic.
         rows = []
         for r in self.results.get(session_key, []):
             status = r.get('status', 'Finished')
@@ -69,11 +72,11 @@ class JolpicaClient:
                          'dsq':status == 'Disqualified', 'dns':status in ('Did not start','Withdrew')})
         return rows
 
-    def starting_grid(self, session_key):
+    def starting_grid(self, session_key, ttl=None):
         return [{'driver_number':int(r['number']), 'position':int(r['grid']) or None}
                 for r in self.results.get(session_key, []) if r.get('number') and r.get('grid')]
 
-    def laps(self, session_key):
+    def laps(self, session_key, ttl=None):
         rows = []
         for r in self.results.get(session_key, []):
             lap = r.get('FastestLap', {}).get('Time', {}).get('time')

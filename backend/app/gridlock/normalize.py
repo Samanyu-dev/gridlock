@@ -27,6 +27,39 @@ from .season import (
 
 UTC = timezone.utc
 
+# A session/round is "live" for roughly this long from its start, and results
+# are still liable to change (penalties, reconciliation) for a while after
+# that — mirrors deadlines.LIVE_WINDOW/PROVISIONAL_WINDOW's real-world
+# reasoning without importing that module's whole GameStore/provider chain
+# into this low-level normalizer.
+_LIVE_WINDOW = timedelta(hours=2, minutes=30)
+_PROVISIONAL_WINDOW = timedelta(hours=24)
+
+# Raw-endpoint cache freshness, scaled to how likely the data is still
+# changing. A flat multi-hour TTL here would freeze an in-progress or
+# just-finished session's *results* for hours; a flat few-second TTL would
+# blow through OpenF1's free-tier rate limit re-fetching settled history.
+_LIVE_TTL = 30.0
+_PROVISIONAL_TTL = 120.0
+_FINALIZED_TTL = 21600.0
+
+
+def _result_ttl(session_start: Optional[datetime], now: datetime) -> float:
+    """How long a session's *result-bearing* endpoints (session_result,
+    starting_grid, laps, pit, weather) can be trusted before refetching.
+    Unknown timing (no date_start) is treated as live — better to over-fetch
+    an unscheduled/malformed session than freeze it for hours."""
+    if session_start is None:
+        return _LIVE_TTL
+    if session_start.tzinfo is None:
+        session_start = session_start.replace(tzinfo=UTC)
+    if now < session_start or now - session_start <= _LIVE_WINDOW:
+        return _LIVE_TTL
+    if now - session_start <= _LIVE_WINDOW + _PROVISIONAL_WINDOW:
+        return _PROVISIONAL_TTL
+    return _FINALIZED_TTL
+
+
 # OpenF1 reports ISO3 country codes; the rest of GRIDLOCK (flags, COUNTRY_NAMES) uses ISO2.
 _ISO3_TO_ISO2 = {
     "AUS": "AU", "CHN": "CN", "JPN": "JP", "BRN": "BH", "KSA": "SA", "USA": "US",
@@ -168,26 +201,35 @@ def _winner(dr: Dict[int, DriverRaceResult]) -> Optional[int]:
 
 def _fetch_weekend(client, weekend: List[dict], race_sess: dict) -> dict:
     """All the raw OpenF1 data one Grand Prix weekend needs, in one call — run
-    across weekends concurrently by the caller."""
+    across weekends concurrently by the caller. Each session's own result-
+    endpoint TTL is scaled to that *session's* timing — a stale qualifying
+    result served from cache must never hold up a race session's fresher one,
+    and vice versa."""
+    now = datetime.now(UTC)
     start = _parse_dt(race_sess.get("date_start"))
-    if start and start > datetime.now(UTC) and all(
-        (_parse_dt(s.get("date_start")) or start) > datetime.now(UTC) for s in weekend
+    if start and start > now and all(
+        (_parse_dt(s.get("date_start")) or start) > now for s in weekend
     ):
         return {"results": {}, "grid": {}, "quali": {}, "has_results": False,
                 "fl": None, "pits": {}, "weather": [], "sprint_results": {},
                 "sprint_grid": {}, "sprint_quali": {}}
+
+    def ttl_for(sess: Optional[dict]) -> float:
+        return _result_ttl(_parse_dt(sess.get("date_start")) if sess else None, now)
+
     skey = race_sess.get("session_key")
-    results = {r.get("driver_number"): r for r in client.session_result(session_key=skey)}
-    grid = {g.get("driver_number"): g.get("position") for g in client.starting_grid(session_key=skey)}
+    race_ttl = ttl_for(race_sess)
+    results = {r.get("driver_number"): r for r in client.session_result(session_key=skey, ttl=race_ttl)}
+    grid = {g.get("driver_number"): g.get("position") for g in client.starting_grid(session_key=skey, ttl=race_ttl)}
     quali_sess = next((s for s in weekend if (s.get("session_name") or "") == "Qualifying"), None)
     quali: Dict[int, int] = {}
     if quali_sess:
-        for q in client.session_result(session_key=quali_sess.get("session_key")):
+        for q in client.session_result(session_key=quali_sess.get("session_key"), ttl=ttl_for(quali_sess)):
             quali[q.get("driver_number")] = q.get("position")
     has_results = any(r.get("position") is not None for r in results.values())
-    fl = fastest_lap_driver(client.laps(session_key=skey)) if has_results else None
-    pits = pit_rank_map(client.pit(session_key=skey)) if has_results else {}
-    weather = client.weather(session_key=skey) if has_results else []
+    fl = fastest_lap_driver(client.laps(session_key=skey, ttl=race_ttl)) if has_results else None
+    pits = pit_rank_map(client.pit(session_key=skey, ttl=race_ttl)) if has_results else {}
+    weather = client.weather(session_key=skey, ttl=race_ttl) if has_results else []
 
     # Sprint weekend: the sprint race and its own grid score separately.
     sprint_sess = next((s for s in weekend if (s.get("session_name") or "") == "Sprint"), None)
@@ -195,8 +237,9 @@ def _fetch_weekend(client, weekend: List[dict], race_sess: dict) -> dict:
     sprint_grid: Dict[int, int] = {}
     if sprint_sess:
         skey2 = sprint_sess.get("session_key")
-        sprint_results = {r.get("driver_number"): r for r in client.session_result(session_key=skey2)}
-        sprint_grid = {g.get("driver_number"): g.get("position") for g in client.starting_grid(session_key=skey2)}
+        sprint_ttl = ttl_for(sprint_sess)
+        sprint_results = {r.get("driver_number"): r for r in client.session_result(session_key=skey2, ttl=sprint_ttl)}
+        sprint_grid = {g.get("driver_number"): g.get("position") for g in client.starting_grid(session_key=skey2, ttl=sprint_ttl)}
 
     # Sprint qualifying (aka Sprint Shootout in some seasons) sets the sprint
     # grid — its own session, distinct from both "Sprint" and "Qualifying".
@@ -206,7 +249,7 @@ def _fetch_weekend(client, weekend: List[dict], race_sess: dict) -> dict:
     )
     sprint_quali: Dict[int, int] = {}
     if sprint_quali_sess:
-        for q in client.session_result(session_key=sprint_quali_sess.get("session_key")):
+        for q in client.session_result(session_key=sprint_quali_sess.get("session_key"), ttl=ttl_for(sprint_quali_sess)):
             sprint_quali[q.get("driver_number")] = q.get("position")
 
     return {
@@ -216,19 +259,52 @@ def _fetch_weekend(client, weekend: List[dict], race_sess: dict) -> dict:
     }
 
 
-def normalize_season(client, year: int) -> Optional[Season]:
-    """Build a full Season from real OpenF1 data for ``year``. Returns None if
-    there isn't enough data to be useful (caller falls back to the seeded
-    season)."""
+def _carry_over_round(rnd: int, base: Season, drivers: Dict[int, Driver], constructors: Dict[int, Constructor]) -> None:
+    """Reuse a safely-finalized round's real scoring contribution from the
+    persisted snapshot instead of re-deriving it. This round wasn't
+    re-fetched (see ``normalize_season``'s ``base`` param), so there is
+    nothing new to score — only carry forward what was already real."""
+    for num, d in drivers.items():
+        bd = base.drivers.get(num)
+        if bd and rnd in bd.round_points:
+            d.points += bd.round_points[rnd]
+            d.round_points[rnd] = bd.round_points[rnd]
+            d.round_breakdown[rnd] = bd.round_breakdown.get(rnd, [])
+            if rnd in bd.results:
+                d.results[rnd] = bd.results[rnd]
+    for cid, c in constructors.items():
+        bc = base.constructors.get(cid)
+        if bc and rnd in bc.round_points:
+            c.points += bc.round_points[rnd]
+            c.round_points[rnd] = bc.round_points[rnd]
+            c.round_breakdown[rnd] = bc.round_breakdown.get(rnd, [])
+
+
+def normalize_season(client, year: int, base: Optional[Season] = None) -> Optional[Season]:
+    """Build a full Season from real data for ``year``. Returns None if there
+    isn't enough data to be useful (caller falls back to another provider).
+
+    ``base`` is the previously persisted Season, if any. A round that's
+    already safely finalized in ``base`` (real classification exists and it's
+    well past the point results could still change) is reused verbatim
+    instead of re-fetched — only rounds that are new, missing real data, or
+    still within their live/provisional window get hit over the network.
+    Without this, a full rebuild re-fetches every past round on every sync;
+    OpenF1's free-tier rate limit serializes those calls to ~1 every 2.1s, so
+    a ~24-round season can take minutes — past any serverless execution
+    window. The very first (cold, ``base=None``) build still fetches
+    everything, which is why the provider bootstraps a cold cache from
+    Jolpica (a handful of paginated calls for the whole season, not
+    per-round) rather than calling this with an OpenF1 client cold."""
     meetings = [
-        m for m in client.meetings(year=year)
+        m for m in client.meetings(year=year, ttl=300.0)
         if not m.get("is_cancelled") and "Grand Prix" in (m.get("meeting_name") or "")
     ]
     if not meetings:
         return None
     meetings.sort(key=lambda m: m.get("date_start") or "")
 
-    all_sessions = client.sessions(year=year)
+    all_sessions = client.sessions(year=year, ttl=300.0)
     by_meeting: Dict[int, List[dict]] = {}
     for s in all_sessions:
         by_meeting.setdefault(s.get("meeting_key"), []).append(s)
@@ -255,16 +331,32 @@ def normalize_season(client, year: int) -> Optional[Season]:
         )
         constructors[cid].driver_ids.append(number)
 
-    # Fetch every weekend's raw data concurrently — sequentially this is ~5
-    # blocking HTTP calls x 24 rounds and takes well over a minute, which is
-    # unusable for a cold request. Each round's calls stay sequential (grid
-    # depends on nothing else), but rounds run in parallel with each other.
-    weekends = []
+    now = datetime.now(UTC)
+    base_by_round: Dict[int, Race] = {r.round: r for r in base.races} if base else {}
+
+    all_weekends = []
     for rnd, meeting in enumerate(meetings, start=1):
         weekend = by_meeting.get(meeting.get("meeting_key"), [])
         race_sess = next((s for s in weekend if (s.get("session_name") or "") == "Race"), None)
         if race_sess is not None:
-            weekends.append((rnd, meeting, weekend, race_sess))
+            all_weekends.append((rnd, meeting, weekend, race_sess))
+
+    def needs_fetch(rnd: int, race_sess: dict) -> bool:
+        prior = base_by_round.get(rnd)
+        if prior is None or not prior.classification:
+            return True  # new round, or no real result carried over yet
+        start = _parse_dt(race_sess.get("date_start")) or now
+        return now <= start + _LIVE_WINDOW + _PROVISIONAL_WINDOW
+
+    # Fetch only rounds that can plausibly have new data — sequentially this
+    # is ~5-8 blocking HTTP calls per round, and OpenF1's free tier
+    # serializes all of them to ~1 every 2.1s regardless of how many rounds
+    # run "concurrently" here, so re-fetching all ~24 rounds every sync would
+    # take minutes. Already-finalized rounds are reused from ``base`` below
+    # instead. Each round's own calls stay sequential (grid depends on
+    # nothing else), but rounds run in parallel with each other.
+    weekends = [w for w in all_weekends if needs_fetch(w[0], w[3])]
+    fetch_rounds = {w[0] for w in weekends}
 
     fetched: Dict[int, dict] = {}
     with ThreadPoolExecutor(max_workers=min(8, len(weekends) or 1)) as pool:
@@ -273,10 +365,16 @@ def normalize_season(client, year: int) -> Optional[Season]:
             fetched[futures[future]] = future.result()
 
     races: List[Race] = []
-    with_data = 0
     elapsed = 0
-    now = datetime.now(UTC)
-    for rnd, meeting, weekend, race_sess in weekends:
+    for rnd, meeting, weekend, race_sess in all_weekends:
+        if rnd not in fetch_rounds:
+            prior = base_by_round[rnd]
+            races.append(prior)
+            if prior.status == "completed":
+                elapsed += 1
+            _carry_over_round(rnd, base, drivers, constructors)
+            continue
+
         is_sprint = any((s.get("session_name") or "") == "Sprint" for s in weekend)
         data = fetched[rnd]
         results, grid, quali = data["results"], data["grid"], data["quali"]
@@ -307,11 +405,10 @@ def normalize_season(client, year: int) -> Optional[Season]:
         # "Completed" means the calendar date has passed — never whether the
         # results happened to be present, so a data gap on one round (OpenF1
         # occasionally has one) doesn't make a past race look "upcoming".
-        status = "completed" if start + timedelta(hours=2, minutes=30) < now else "live" if start <= now else "upcoming"
+        status = "completed" if start + _LIVE_WINDOW < now else "live" if start <= now else "upcoming"
         if status == "completed":
             elapsed += 1
         if has_results:
-            with_data += 1
             dotd_id = None
             for num, result in dr.items():
                 mate = _teammate(num, drivers, dr)

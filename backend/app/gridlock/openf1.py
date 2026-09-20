@@ -54,7 +54,14 @@ class OpenF1Client:
         self._responses = {}
         self._loaded = False
 
-    def get(self, path: str, **params) -> List[dict]:
+    def get(self, path: str, ttl: Optional[float] = None, **params) -> List[dict]:
+        """``ttl`` (seconds) is cache-control, kept separate from ``params``
+        (the actual query string) so it can never leak into the request URL.
+        Callers that know a specific session's real-world timing (see
+        normalize._result_ttl) should always pass one; the fallback here is
+        deliberately short (never the old flat 6h) so a caller that forgets
+        fails toward re-fetching too often rather than freezing stale/partial
+        results for hours."""
         qs = urlencode({k: v for k, v in params.items() if v is not None})
         url = f"{self.base}/{path.lstrip('/')}"
         if qs:
@@ -68,8 +75,8 @@ class OpenF1Client:
                 self._responses = load_raw()
                 self._loaded = True
             cached = self._responses.get(url)
-            ttl = 300 if path in ('meetings', 'sessions') else 21600
-            if cached and time.time() - cached['at'] < ttl:
+            effective_ttl = ttl if ttl is not None else (300.0 if path in ('meetings', 'sessions') else 30.0)
+            if cached and time.time() - cached['at'] < effective_ttl:
                 return cached['rows']
             gap = max(0, 2.1 - (time.monotonic() - self._last_request))
             if gap:
@@ -95,17 +102,17 @@ class OpenF1Client:
         return h
 
     # Convenience wrappers (kept 1:1 with OpenF1 resources).
-    def sessions(self, **p): return self.get("sessions", **p)
-    def drivers(self, **p): return self.get("drivers", **p)
-    def meetings(self, **p): return self.get("meetings", **p)
-    def session_result(self, **p): return self.get("session_result", **p)
-    def starting_grid(self, **p): return self.get("starting_grid", **p)
-    def laps(self, **p): return self.get("laps", **p)
-    def pit(self, **p): return self.get("pit", **p)
-    def position(self, **p): return self.get("position", **p)
-    def intervals(self, **p): return self.get("intervals", **p)
-    def race_control(self, **p): return self.get("race_control", **p)
-    def weather(self, **p): return self.get("weather", **p)
+    def sessions(self, ttl=None, **p): return self.get("sessions", ttl=ttl, **p)
+    def drivers(self, ttl=None, **p): return self.get("drivers", ttl=ttl, **p)
+    def meetings(self, ttl=None, **p): return self.get("meetings", ttl=ttl, **p)
+    def session_result(self, ttl=None, **p): return self.get("session_result", ttl=ttl, **p)
+    def starting_grid(self, ttl=None, **p): return self.get("starting_grid", ttl=ttl, **p)
+    def laps(self, ttl=None, **p): return self.get("laps", ttl=ttl, **p)
+    def pit(self, ttl=None, **p): return self.get("pit", ttl=ttl, **p)
+    def position(self, ttl=None, **p): return self.get("position", ttl=ttl, **p)
+    def intervals(self, ttl=None, **p): return self.get("intervals", ttl=ttl, **p)
+    def race_control(self, ttl=None, **p): return self.get("race_control", ttl=ttl, **p)
+    def weather(self, ttl=None, **p): return self.get("weather", ttl=ttl, **p)
 
 
 class OpenF1Provider(MotorsportDataProvider):
@@ -129,6 +136,7 @@ class OpenF1Provider(MotorsportDataProvider):
 
     def get_season(self, force: bool = False) -> Season:
         if self._season is not None and not force:
+            self._maybe_schedule_refresh()
             return self._season
         with self._sync_lock:
             if not self._cache_loaded:
@@ -144,44 +152,71 @@ class OpenF1Provider(MotorsportDataProvider):
                 raise HTTPException(503, 'Race data is temporarily unavailable. Please retry shortly.')
             return self._season
 
-    def refresh_if_stale(self):
-        # FastAPI runs this after sending /meta. Cached reads never wait for
-        # the refresh; the lock prevents concurrent reconciliations per worker.
-        if not self._sync_lock.acquire(blocking=False):
+    def _is_stale(self) -> bool:
+        anchor = getattr(self, '_last_attempt', None) or self.last_synced_at
+        return anchor is None or (datetime.now(UTC) - anchor).total_seconds() > SEASON_CACHE_TTL
+
+    def _maybe_schedule_refresh(self) -> None:
+        """Freshness is a provider concern, not a route concern: every
+        get_season() call runs this same check, not just /meta's explicit
+        BackgroundTasks hook below — an API consumer that never calls /meta
+        must not be able to keep an in-memory season stale indefinitely."""
+        if not self._is_stale():
             return
+        if not self._sync_lock.acquire(blocking=False):
+            return  # another thread is already refreshing
+        threading.Thread(target=self._sync_and_release, daemon=True).start()
+
+    def _sync_and_release(self) -> None:
         try:
-            anchor = getattr(self, '_last_attempt', None) or self.last_synced_at
-            if anchor is None or (datetime.now(UTC) - anchor).total_seconds() > SEASON_CACHE_TTL:
-                self._sync()
+            self._sync()
         finally:
             self._sync_lock.release()
 
+    def refresh_if_stale(self):
+        # Kept for /meta's explicit BackgroundTasks hook, which gets the
+        # refresh running slightly sooner for that route — get_season() now
+        # runs the same check on every call regardless, so this is no longer
+        # the *only* path that keeps the season fresh.
+        self._maybe_schedule_refresh()
+
     def _sync(self) -> None:
-        """One deterministic recompute from whatever OpenF1 reports right
+        """One deterministic recompute from whatever the feed reports right
         now. Never patches individual points — a full, reproducible rebuild
         is the only way results ever change here. Reconciliation (persisting
         the ledger baseline + auditing any real change) happens after, and
-        can never fail the sync itself."""
+        can never fail the sync itself.
+
+        Cold (no season yet — ``self._season is None``): OpenF1's free-tier
+        rate limit serializes every HTTP call to ~1 per 2.1s regardless of
+        how many rounds fetch "concurrently", so rebuilding a ~24-round
+        season that way can take minutes — past a serverless execution
+        window. Jolpica has no such per-round cost (its whole-season
+        calendar/results/qualifying come from a handful of paginated calls,
+        not one call per round), so it bootstraps the very first snapshot,
+        persisted immediately.
+
+        Warm (a season already exists): normalize_season only re-fetches
+        rounds that are new or still within their live/provisional window
+        (see normalize._result_ttl's sibling round-level check) — already-
+        finalized rounds are reused from the prior snapshot, so a routine
+        resync stays fast no matter how many historical rounds exist."""
         from .reconciliation import finish_run, reconcile, start_run
         t0 = time.monotonic()
         run_id = start_run(self.name)
         changes = 0
         try:
             from .normalize import normalize_season
-            source = 'openf1'
-            try:
-                season = normalize_season(self.client, self.year)
-            except Exception:
-                # Never replace an existing full snapshot with a less complete
-                # provider. Backup is only for bootstrapping an empty cache.
-                if self._season is not None:
-                    raise
+            if self._season is None:
                 from .jolpica import JolpicaClient
                 season = normalize_season(JolpicaClient(self.year), self.year)
                 source = 'jolpica'
+            else:
+                season = normalize_season(self.client, self.year, base=self._season)
+                source = 'openf1'
 
             if season is None:
-                raise RuntimeError("OpenF1 returned no usable data")
+                raise RuntimeError("No usable data from any provider")
             season.source = source
             self._season = season
             from .feed_cache import save
