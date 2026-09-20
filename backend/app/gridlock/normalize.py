@@ -43,6 +43,12 @@ _LIVE_TTL = 30.0
 _PROVISIONAL_TTL = 120.0
 _FINALIZED_TTL = 21600.0
 
+# How many "jolpica-basic" historical rounds get upgraded to full OpenF1
+# detail (pit stops, weather) per sync — bounded so catching up on a backlog
+# of them (e.g. right after the very first cold bootstrap) can't turn a
+# routine warm sync back into a many-round rebuild.
+_ENRICHMENT_BUDGET = 2
+
 
 def _result_ttl(session_start: Optional[datetime], now: datetime) -> float:
     """How long a session's *result-bearing* endpoints (session_result,
@@ -280,7 +286,7 @@ def _carry_over_round(rnd: int, base: Season, drivers: Dict[int, Driver], constr
             c.round_breakdown[rnd] = bc.round_breakdown.get(rnd, [])
 
 
-def normalize_season(client, year: int, base: Optional[Season] = None) -> Optional[Season]:
+def normalize_season(client, year: int, base: Optional[Season] = None, source: str = "openf1") -> Optional[Season]:
     """Build a full Season from real data for ``year``. Returns None if there
     isn't enough data to be useful (caller falls back to another provider).
 
@@ -295,7 +301,17 @@ def normalize_season(client, year: int, base: Optional[Season] = None) -> Option
     window. The very first (cold, ``base=None``) build still fetches
     everything, which is why the provider bootstraps a cold cache from
     Jolpica (a handful of paginated calls for the whole season, not
-    per-round) rather than calling this with an OpenF1 client cold."""
+    per-round) rather than calling this with an OpenF1 client cold.
+
+    ``source`` tags every freshly-fetched round's ``Race.data_source``:
+    "jolpica-basic" for the cold bootstrap (Jolpica has no pit-stop data, so
+    constructor pit-stop bonus points are genuinely absent from those rounds
+    — never fabricated, just missing) or "openf1-full" once a round has been
+    fetched with OpenF1's fuller per-session detail. A safely-finalized round
+    still marked "jolpica-basic" is also eligible for re-fetch (bounded, see
+    ``_ENRICHMENT_BUDGET``) when ``source="openf1"``, so those rounds
+    eventually converge on full detail a few at a time instead of either
+    blocking the cold bootstrap on all of them or never fixing them."""
     meetings = [
         m for m in client.meetings(year=year, ttl=300.0)
         if not m.get("is_cancelled") and "Grand Prix" in (m.get("meeting_name") or "")
@@ -341,7 +357,7 @@ def normalize_season(client, year: int, base: Optional[Season] = None) -> Option
         if race_sess is not None:
             all_weekends.append((rnd, meeting, weekend, race_sess))
 
-    def needs_fetch(rnd: int, race_sess: dict) -> bool:
+    def must_fetch(rnd: int, race_sess: dict) -> bool:
         prior = base_by_round.get(rnd)
         if prior is None or not prior.classification:
             return True  # new round, or no real result carried over yet
@@ -355,7 +371,28 @@ def normalize_season(client, year: int, base: Optional[Season] = None) -> Option
     # take minutes. Already-finalized rounds are reused from ``base`` below
     # instead. Each round's own calls stay sequential (grid depends on
     # nothing else), but rounds run in parallel with each other.
-    weekends = [w for w in all_weekends if needs_fetch(w[0], w[3])]
+    required = [w for w in all_weekends if must_fetch(w[0], w[3])]
+    required_rounds = {w[0] for w in required}
+
+    # Historical rounds bootstrapped via Jolpica have no pit-stop data (its
+    # per-round pit-stop endpoint isn't fetched during the fast bootstrap —
+    # see jolpica.py), so constructor pit-stop bonus points are genuinely
+    # missing from them, not just cosmetically less detailed. Rather than
+    # leaving that permanently wrong, a small bounded number of them get
+    # upgraded to full OpenF1 detail each sync — bounded so a database with
+    # many jolpica-basic rounds (e.g. right after the first-ever cold
+    # bootstrap) doesn't turn a routine warm sync back into a full rebuild.
+    enrichment: List[tuple] = []
+    if source == "openf1":
+        candidates = [
+            w for w in all_weekends
+            if w[0] not in required_rounds
+            and (prior := base_by_round.get(w[0])) is not None
+            and prior.data_source == "jolpica-basic"
+        ]
+        enrichment = candidates[:_ENRICHMENT_BUDGET]
+
+    weekends = required + enrichment
     fetch_rounds = {w[0] for w in weekends}
 
     fetched: Dict[int, dict] = {}
@@ -457,6 +494,7 @@ def normalize_season(client, year: int, base: Optional[Season] = None) -> Option
             sprint_classification=_classification(sprint_dr, drivers, constructors) if sprint_dr and has_results else [],
             sprint_quali=_quali_rows({n:p for n,p in sprint_quali.items() if n in drivers}, drivers, constructors) if sprint_quali else [],
             circuit_image_url=meeting.get("circuit_image") or "",
+            data_source=(f"{source}-full" if source == "openf1" else f"{source}-basic") if has_results else "unknown",
         ))
 
     if not races:

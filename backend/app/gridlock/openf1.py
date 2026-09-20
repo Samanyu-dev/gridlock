@@ -44,7 +44,12 @@ SEASON_CACHE_TTL = float(os.environ.get("GRIDLOCK_SEASON_CACHE_TTL", "300"))
 
 
 class OpenF1Client:
-    """Thin HTTP client for OpenF1. Returns parsed JSON lists, or [] on failure."""
+    """Thin HTTP client for OpenF1. Returns parsed JSON lists on success; an
+    HTTP/network failure raises rather than returning [] — an empty list is
+    a legitimate response (e.g. a session with no pit stops) and must never
+    be confused with "the request failed", so callers (ultimately _sync())
+    can tell a real empty result apart from a fetch that needs to keep the
+    last known-good season instead of overwriting it with nothing."""
 
     def __init__(self, base: str = OPENF1_BASE, token: Optional[str] = OPENF1_TOKEN) -> None:
         self.base = base.rstrip("/")
@@ -209,11 +214,11 @@ class OpenF1Provider(MotorsportDataProvider):
             from .normalize import normalize_season
             if self._season is None:
                 from .jolpica import JolpicaClient
-                season = normalize_season(JolpicaClient(self.year), self.year)
                 source = 'jolpica'
+                season = normalize_season(JolpicaClient(self.year), self.year, source=source)
             else:
-                season = normalize_season(self.client, self.year, base=self._season)
                 source = 'openf1'
+                season = normalize_season(self.client, self.year, base=self._season, source=source)
 
             if season is None:
                 raise RuntimeError("No usable data from any provider")

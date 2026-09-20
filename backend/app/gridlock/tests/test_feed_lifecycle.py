@@ -1,11 +1,17 @@
 import json
+import os
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 import pytest
 from fastapi import HTTPException
-from app.gridlock.normalize import normalize_season, _fetch_weekend, _result_ttl, _LIVE_TTL, _PROVISIONAL_TTL, _FINALIZED_TTL
+from sqlmodel import Session, SQLModel, select
+from app.gridlock.normalize import (
+    normalize_season, _fetch_weekend, _result_ttl,
+    _LIVE_TTL, _PROVISIONAL_TTL, _FINALIZED_TTL, _ENRICHMENT_BUDGET,
+)
 from app.gridlock.tests.test_normalize import _FakeClient
 from app.gridlock.feed_cache import encode, decode
 from app.gridlock.openf1 import OpenF1Client, OpenF1Provider, SEASON_CACHE_TTL
@@ -232,3 +238,139 @@ def test_get_season_schedules_refresh_even_without_the_meta_route():
 
     assert result is provider._season  # never blocks on the refresh
     mock_sync.assert_called_once()
+
+
+# --------------------------------------------------------------------------- #
+# Per-round provenance + bounded incremental enrichment. The Jolpica cold
+# bootstrap has no pit-stop data (its per-round pit-stop endpoint isn't
+# fetched during the fast bootstrap), so constructor pit-stop bonus points
+# (+5/+3/+1 for the top 3 pit ranks) are genuinely missing from those rounds
+# — never fabricated, but also never left permanently wrong. A bounded
+# number of "jolpica-basic" rounds get upgraded to "openf1-full" per sync.
+# --------------------------------------------------------------------------- #
+
+class _MultiRoundFakeClient:
+    """Three finalized rounds, all real (dates far in the past relative to
+    "now" in this test environment) — enough rounds to prove enrichment is
+    bounded per sync rather than catching up on an entire backlog at once."""
+    ROUNDS = (1, 2, 3)
+
+    def meetings(self, **p):
+        return [
+            {"meeting_key": i, "meeting_name": f"Round {i} Grand Prix", "country_code": "BRN",
+             "is_cancelled": False, "date_start": f"2026-0{i}-02T15:00:00+00:00"}
+            for i in self.ROUNDS
+        ]
+
+    def sessions(self, **p):
+        return [
+            {"session_key": 100 + i, "meeting_key": i, "session_name": "Race",
+             "date_start": f"2026-0{i}-02T15:00:00+00:00", "circuit_short_name": "Sakhir", "location": "Sakhir"}
+            for i in self.ROUNDS
+        ]
+
+    def session_result(self, **p):
+        return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}]
+
+    def starting_grid(self, **p):
+        return [{"driver_number": 1, "position": 1}, {"driver_number": 44, "position": 2}]
+
+    def laps(self, **p):
+        return [{"driver_number": 1, "lap_duration": 95.1}, {"driver_number": 44, "lap_duration": 94.8}]
+
+    def pit(self, **p):
+        return []
+
+    def weather(self, **p):
+        return [{"rainfall": 0, "air_temperature": 31}]
+
+
+def test_cold_bootstrap_marks_every_round_jolpica_basic():
+    season = normalize_season(_FakeClient(), 2026, source='jolpica')
+    assert season.races[0].data_source == 'jolpica-basic'
+
+
+def test_warm_openf1_sync_marks_freshly_fetched_rounds_openf1_full():
+    base = normalize_season(_FakeClient(), 2026, source='jolpica')
+    # The fixture's one round has no prior classification carried over from
+    # nothing, so it's "required" (must-fetch), not merely "enrichment" —
+    # either way a fresh OpenF1-sourced fetch should tag it openf1-full.
+    base.races[0].classification = []  # force must-fetch, isolate the tag logic
+    rebuilt = normalize_season(_FakeClient(), 2026, base=base, source='openf1')
+    assert rebuilt.races[0].data_source == 'openf1-full'
+
+
+def test_enrichment_is_bounded_per_sync_not_a_full_backlog_catchup():
+    base = normalize_season(_MultiRoundFakeClient(), 2026, source='jolpica')
+    assert len(base.races) == 3
+    assert all(r.data_source == 'jolpica-basic' for r in base.races)
+
+    enriched = normalize_season(_MultiRoundFakeClient(), 2026, base=base, source='openf1')
+    upgraded = [r for r in enriched.races if r.data_source == 'openf1-full']
+    still_basic = [r for r in enriched.races if r.data_source == 'jolpica-basic']
+    assert len(upgraded) == _ENRICHMENT_BUDGET  # bounded, not all 3 at once
+    assert len(still_basic) == len(base.races) - _ENRICHMENT_BUDGET
+
+
+def test_openf1_full_round_is_never_reselected_for_enrichment():
+    class _FullyEnrichableClient(_MultiRoundFakeClient):
+        ROUNDS = tuple(range(1, _ENRICHMENT_BUDGET + 1))  # exactly the budget — one pass covers all of them
+
+    base = normalize_season(_FullyEnrichableClient(), 2026, source='jolpica')
+    once = normalize_season(_FullyEnrichableClient(), 2026, base=base, source='openf1')
+    assert all(r.data_source == 'openf1-full' for r in once.races)
+
+    class ExplodingClient(_FullyEnrichableClient):
+        def session_result(self, **p):
+            raise AssertionError('an already openf1-full round must not be refetched again')
+
+    twice = normalize_season(ExplodingClient(), 2026, base=once, source='openf1')
+    assert all(r.data_source == 'openf1-full' for r in twice.races)  # unchanged, nothing exploded
+
+
+@pytest.fixture()
+def db():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    os.environ["DATABASE_URL"] = f"sqlite:///{path}"
+    import importlib
+    from app import database
+    from app.gridlock import reconciliation
+    importlib.reload(database)
+    importlib.reload(reconciliation)  # re-bind its `engine` reference too
+    SQLModel.metadata.create_all(database.engine)
+    yield database
+    os.remove(path)
+
+
+def test_pit_stop_enrichment_is_recorded_as_a_real_reconciliation_correction(db):
+    """The exact scenario from review: a Jolpica-bootstrapped round has no
+    pit-stop data, so a constructor's pit-stop bonus is genuinely missing
+    (never fabricated) until enriched from OpenF1. The same reconcile()
+    every sync already runs must record the resulting point change as a
+    real, audited correction, not silently rewrite it."""
+    from app.gridlock.reconciliation import reconcile
+    from app.gridlock.models import GLLedgerAudit
+
+    base = normalize_season(_FakeClient(), 2026, source='jolpica')
+    assert base.races[0].data_source == 'jolpica-basic'
+    assert base.constructors[1].round_breakdown.get(1, [])  # sanity: round 1 was scored
+    reconcile(base, run_id=1)  # establish the baseline — no pit bonus yet
+
+    class _WithPitData(_FakeClient):
+        def pit(self, **p):
+            return [{'driver_number': 1, 'pit_duration': 21.0}]  # McLaren's only stop: fastest by default
+
+    enriched = normalize_season(_WithPitData(), 2026, base=base, source='openf1')
+    assert enriched.races[0].data_source == 'openf1-full'
+    mclaren_items = enriched.constructors[1].round_breakdown.get(1, [])
+    assert any(item.get('rule_code') == 'CON_PIT_1' for item in mclaren_items), mclaren_items
+
+    changes = reconcile(enriched, run_id=2)
+    assert changes >= 1
+    with Session(db.engine) as session:
+        rows = session.exec(select(GLLedgerAudit)).all()
+    assert any(
+        r.entity_type == 'constructor' and r.entity_id == 1 and r.delta > 0
+        for r in rows
+    ), rows

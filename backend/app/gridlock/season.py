@@ -227,6 +227,13 @@ class Race:
     sprint_classification: List[dict] = field(default_factory=list)
     sprint_quali: List[dict] = field(default_factory=list)
     circuit_image_url: str = ""
+    # Per-round provenance for the real-data pipeline: "jolpica-basic" (the
+    # cold-bootstrap source, which has no pit-stop data — see normalize.py)
+    # vs "openf1-full" (richer per-session detail, including pit stops).
+    # Never set for the mock/seeded season. A round stays "jolpica-basic"
+    # until incrementally enriched — see the `enrichment` selection in
+    # normalize.normalize_season, bounded by _ENRICHMENT_BUDGET per sync.
+    data_source: str = "unknown"
 
 
 @dataclass
