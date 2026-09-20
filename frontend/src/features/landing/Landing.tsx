@@ -1,21 +1,17 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { ArrowRight, Gauge, Trophy, Users, Radio, Zap, LineChart } from 'lucide-react'
 import { Brand } from '../../components/Brand'
 import { RacingLine } from '../../components/RacingLine'
-import { Countdown, CountUp } from '../../components/motion'
+import { Countdown } from '../../components/motion'
 import { Avatar, Delta } from '../../components/bits'
 import { api } from '../../lib/api'
 import { useMetaStatus } from '../../lib/meta'
 import { useSession } from '../../lib/session'
-import { flagEmoji, money } from '../../lib/format'
+import { flagEmoji } from '../../lib/format'
 import type { Driver, LeaderboardRow } from '../../lib/types'
 
-// three.js + R3F are heavy — split into their own chunk so every visitor to
-// "/" (including ones who never see the hero render) doesn't pay for it in
-// the initial bundle.
-const HeroCarScene = lazy(() => import('./HeroCarScene').then((m) => ({ default: m.HeroCarScene })))
+import { CinematicHero } from './CinematicHero'
 
 export default function Landing() {
   const navigate = useNavigate()
@@ -61,62 +57,7 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section style={{ position: 'relative', overflow: 'hidden', minHeight: '82vh', display: 'flex', alignItems: 'center' }}>
-        <div className="container landing-hero-layout" style={{ position: 'relative', padding: '48px 20px 40px', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 40, alignItems: 'center' }}>
-          <div>
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <span className="chip" style={{ marginBottom: 20 }}>Season {meta?.season ?? 2026} · Free to play</span>
-              <h1 className="display" style={{ fontSize: 'clamp(44px, 5.5vw, 76px)', margin: '10px 0' }}>
-                Build your grid.<br /><span style={{ color: 'var(--red)' }}>Own the weekend.</span>
-              </h1>
-              <p className="text-dim" style={{ fontSize: 18, maxWidth: 480, lineHeight: 1.5, marginBottom: 28 }}>
-                Draft ten drivers and two constructors under a $300M budget. Score qualifying, sprint and race results. Make the transfers, call the boosts, and climb from the paddock
-                to the top of the global grid.
-              </p>
-              <div className="row gap-2 wrap">
-                <Link to="/onboarding" className="btn btn-primary btn-lg">Build my team <ArrowRight size={18} /></Link>
-                <a href="#how" className="btn btn-ghost btn-lg">See how it works</a>
-              </div>
-            </motion.div>
-          </div>
-
-          <div className="landing-stage-column">
-            <div className="landing-car-stage">
-              <div className="stage-caption"><span className="eyebrow">GRIDLOCK / CONCEPT 01</span><span>3D design studio</span></div>
-              <Suspense fallback={<img className="car-poster" src="/models/cars/gridlock-formula/fallback.svg" alt="GRIDLOCK open-wheel concept" />}><HeroCarScene /></Suspense>
-            </div>
-          {/* Season results */}
-          <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-            className="panel panel-glow" style={{ padding: 20 }}>
-            <div className="row between" style={{ marginBottom: 14 }}>
-              <span className="eyebrow">Season fantasy leaders</span>
-              <span className="chip">Season results</span>
-            </div>
-            <div className="col gap-1">
-              {drivers.map((d, i) => (
-                <motion.div key={d.id} className="row between race-edge"
-                  style={{ ['--accent' as string]: d.constructor.color, padding: '8px 8px 8px 16px', borderRadius: 8, background: 'var(--surface-2)' }}
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.08 }}>
-                  <div className="row gap-2">
-                    <span className="pos" style={{ minWidth: 20 }}>P{i + 1}</span>
-                    <Avatar name={d.name} number={d.number} color={d.constructor.color} size={34} image={d.image_url} />
-                    <div className="col">
-                      <span style={{ fontWeight: 600, fontSize: 14 }}>{d.short}</span>
-                      <span className="eyebrow">{d.constructor.short}</span>
-                    </div>
-                  </div>
-                  <div className="col" style={{ alignItems: 'flex-end' }}>
-                    <span className="num" style={{ fontWeight: 700, color: 'var(--gain)' }}>+<CountUp value={d.last5[d.last5.length - 1] || 0} /> PTS</span>
-                    <span className="eyebrow">{money(d.price)}</span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-          </div>
-        </div>
-      </section>
+      <CinematicHero />
 
       {feedError && <div className="container feed-notice" role="status">{feedError}</div>}
       {/* Race weekend preview */}
@@ -192,14 +133,14 @@ export default function Landing() {
       <section id="fantasy" className="container" style={{ padding: '40px 20px' }}>
         <span className="eyebrow">Why GRIDLOCK</span>
         <h2 className="display" style={{ fontSize: 'clamp(28px,4vw,44px)', margin: '8px 0 24px' }}>A full race-weekend, gamified.</h2>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="grid landing-features">
           {[
             [Gauge, 'Deep scoring', 'Points for qualifying, positions gained, fastest laps, teammate battles, DNFs and more — all from a transparent engine.'],
             [Radio, 'Live race centre', 'Follow weekend results and inspect every scoring event as data arrives.'],
             [Users, 'Private leagues', 'Spin up a league in seconds, share a code, and settle it on the track.'],
             [Zap, 'Tactical boosts', 'Back an Underdog for a 2× round multiplier if they finish P6–P10.'],
             [LineChart, 'Driver analytics', 'Compare form, value and race history to find the edge before the deadline.'],
-            [Trophy, 'Global grid', 'Climb a worldwide leaderboard built to scale to millions of managers.'],
+            [Trophy, 'Global grid', 'See how your team stacks up against the rest of the grid.'],
           ].map(([Icon, title, body], i) => {
             const I = Icon as typeof Gauge
             return (
@@ -215,11 +156,11 @@ export default function Landing() {
 
       {/* Leaderboard preview */}
       <section id="leaderboard" className="container" style={{ padding: '40px 20px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 32, alignItems: 'center' }}>
+        <div className="landing-leaderboard">
           <div>
             <span className="eyebrow">The global grid</span>
             <h2 className="display" style={{ fontSize: 'clamp(28px,4vw,44px)', margin: '10px 0 14px' }}>Race the world, every weekend.</h2>
-            <p className="text-dim" style={{ fontSize: 16, lineHeight: 1.6 }}>Every point moves you up the order. Rankings recalculate the instant results land.</p>
+            <p className="text-dim" style={{ fontSize: 16, lineHeight: 1.6 }}>Every point moves you up the order. Rankings update as verified results arrive.</p>
           </div>
           <div className="panel" style={{ overflow: 'hidden' }}>
             {board.map((row, i) => (

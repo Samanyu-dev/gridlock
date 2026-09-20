@@ -1,5 +1,5 @@
 import { PCFShadowMap } from 'three'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { PerformanceMonitor, useProgress } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { CAMERA_PRESETS, type CameraPresetSpec } from './CameraRig'
@@ -22,12 +22,44 @@ interface GLShowroomProps {
    * normalized to a similar display size still does, but a caller
    * rendering at real-world scale would need more. */
   far?: number
+  onDemand?: boolean
+  transparent?: boolean
+  onReady?: (ready: boolean) => void
 }
 
 function LoadingOverlay({ image, label }: { image: string; label?: string }) {
   const { active } = useProgress()
   if (!active) return null
   return <FallbackRenderer image={image} label={label} />
+}
+
+function ReadySignal({ onReady }: { onReady?: (ready: boolean) => void }) {
+  useEffect(() => { onReady?.(true); return () => onReady?.(false) }, [onReady])
+  return null
+}
+
+/** Render while settling after input, then let the GPU idle. */
+function DemandFrames({ enabled, mobile }: { enabled: boolean; mobile: boolean }) {
+  const { invalidate } = useThree()
+  const { active } = useProgress()
+  useEffect(() => {
+    if (!enabled) return
+    let raf = 0, until = 0, previous = 0
+    const frame = (time: number) => {
+      if (time - previous >= (mobile ? 32 : 15)) { invalidate(); previous = time }
+      if (time < until) raf = requestAnimationFrame(frame)
+      else raf = 0
+    }
+    const wake = () => {
+      until = performance.now() + 1400
+      if (!raf) raf = requestAnimationFrame(frame)
+    }
+    wake()
+    window.addEventListener('scroll', wake, { passive: true })
+    window.addEventListener('resize', wake)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', wake); window.removeEventListener('resize', wake) }
+  }, [enabled, mobile, active, invalidate])
+  return null
 }
 
 /** The one <Canvas> every 3D feature mounts — Suspense, an error boundary
@@ -38,7 +70,7 @@ function LoadingOverlay({ image, label }: { image: string; label?: string }) {
  * instead) on reduced-motion, weak GPUs, or when WebGL isn't available at
  * all. Homepage hero, driver showroom, and the garage all mount this rather
  * than building their own <Canvas>/Suspense/lighting stack. */
-export function GLShowroom({ fallbackImage, fallbackLabel, children, forceTier, initialCamera, far = 100 }: GLShowroomProps) {
+export function GLShowroom({ fallbackImage, fallbackLabel, children, forceTier, initialCamera, far = 100, onDemand = false, transparent = false, onReady }: GLShowroomProps) {
   const detected = usePerformanceTier()
   const tier = forceTier ?? detected
   const [failed, setFailed] = useState(false)
@@ -70,20 +102,22 @@ export function GLShowroom({ fallbackImage, fallbackLabel, children, forceTier, 
 
   return (
     <div ref={host} style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {staticOnly ? <FallbackRenderer image={fallbackImage} label={fallbackLabel} /> : <Canvas
-        frameloop={visible && pageVisible ? 'always' : 'never'}
+      {staticOnly ? <FallbackRenderer image={fallbackImage} label={fallbackLabel} /> : <GLErrorBoundary onError={() => setFailed(true)}><Canvas
+        fallback={<FallbackRenderer image={fallbackImage} label={fallbackLabel} />}
+        frameloop={visible && pageVisible ? (onDemand ? 'demand' : 'always') : 'never'}
         shadows={TIER_SHADOWS[tier] ? { type: PCFShadowMap } : false}
         dpr={dpr}
-        gl={{ antialias: tier !== 'performance', powerPreference: 'high-performance' }}
+        gl={{ alpha: transparent, antialias: tier !== 'performance', powerPreference: 'high-performance' }}
         camera={{ position: initialCamera?.position ?? CAMERA_PRESETS.HERO.position, fov: initialCamera?.fov ?? CAMERA_PRESETS.HERO.fov, near: 0.1, far }}
         onCreated={onCreated}
         style={{ touchAction: 'pan-y' }}
       >
-        <PerformanceMonitor onDecline={() => setDprBoost(0.6)} onIncline={() => setDprBoost(1)} />
+        {onDemand && <DemandFrames enabled={visible && pageVisible} mobile={tier === 'performance'} />}
+        {!onDemand && <PerformanceMonitor onDecline={() => setDprBoost(0.6)} onIncline={() => setDprBoost(1)} />}
         <GLErrorBoundary onError={() => setFailed(true)}>
-          <Suspense fallback={null}>{children}</Suspense>
+          <Suspense fallback={null}>{children}<ReadySignal onReady={onReady} /></Suspense>
         </GLErrorBoundary>
-      </Canvas>}
+      </Canvas></GLErrorBoundary>}
       <LoadingOverlay image={fallbackImage} label={fallbackLabel} />
     </div>
   )

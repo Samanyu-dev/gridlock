@@ -23,6 +23,7 @@ export interface ModelViewerProps {
   transitionKey?: unknown
   /** Adds the captain's slow "restrained" breathing scale pulse. */
   breathe?: boolean
+  reveal?: boolean
 }
 
 /** Loads a manifest car asset and renders it with drag/idle/zoom/parallax
@@ -30,7 +31,7 @@ export interface ModelViewerProps {
  * page's car tab, and garage all mount instead of each wiring useGLTF +
  * pointer handling themselves. */
 export function ModelViewer({
-  asset, quality = 'medium', interactive = true, interactionOptions, interactionState, bodyColor, transitionKey, breathe,
+  asset, quality = 'medium', interactive = true, interactionOptions, interactionState, bodyColor, transitionKey, breathe, reveal = true,
 }: ModelViewerProps) {
   const { scene } = useCarModel(asset, quality, bodyColor)
   const groupRef = useRef<Group>(null)
@@ -38,7 +39,7 @@ export function ModelViewer({
   const revealRef = useSceneTransition(transitionKey ?? asset.id + quality, { breathe })
 
   return (
-    <group ref={revealRef}>
+    <group ref={reveal ? revealRef : undefined}>
       <group ref={groupRef}>
         <primitive object={scene} />
       </group>

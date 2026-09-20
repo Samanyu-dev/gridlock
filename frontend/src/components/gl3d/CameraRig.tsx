@@ -1,4 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber'
+import { sampleCamera, type CameraFrame } from '../../lib/gl3d/cameraTimeline'
 import { useRef } from 'react'
 import { MathUtils, Vector3 } from 'three'
 import type { InteractionState } from './InteractionController'
@@ -34,6 +35,7 @@ interface CameraRigProps {
    * inputs (scroll on the homepage, pointer in the showroom) never fight
    * over the same field. */
   scrollShift?: number
+  timeline?: { frames: CameraFrame[]; progress: React.RefObject<number> }
 }
 
 function resolveSpec(preset: CameraPreset | CameraPresetSpec): CameraPresetSpec {
@@ -45,15 +47,16 @@ function resolveSpec(preset: CameraPreset | CameraPresetSpec): CameraPresetSpec 
  * the garage, and the circuit scenes (which pass their own top-down/hero/
  * follow specs rather than car preset names). Lives inside <Canvas>; mount
  * once per scene. */
-export function CameraRig({ preset, lerpSpeed = 4, interaction, scrollShift = 0 }: CameraRigProps) {
+export function CameraRig({ preset, lerpSpeed = 4, interaction, scrollShift = 0, timeline }: CameraRigProps) {
   const { camera } = useThree()
   const initial = resolveSpec(preset)
   const target = useRef(new Vector3(...initial.position))
   const currentTarget = useRef(new Vector3(...initial.target))
   const desiredFov = useRef(initial.fov)
+  const sampled = useRef<CameraPresetSpec>({ position: [...initial.position], target: [...initial.target], fov: initial.fov })
 
   useFrame((_, delta) => {
-    const spec = resolveSpec(preset)
+    const spec = timeline ? sampleCamera(timeline.frames, timeline.progress.current, sampled.current) : resolveSpec(preset)
     const zoom = interaction?.current.zoom ?? 1
     const parX = interaction?.current.parallaxX ?? 0
     const parY = interaction?.current.parallaxY ?? 0

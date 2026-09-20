@@ -45,7 +45,7 @@ export const GL3D_MANIFEST: Record<string, GL3DAsset> = {
       medium: '/models/cars/gridlock-formula/medium.glb',
       low: '/models/cars/gridlock-formula/low.glb',
     },
-    fallbackImage: '/models/cars/gridlock-formula/fallback.svg',
+    fallbackImage: '/models/cars/gridlock-formula/studio-poster.jpg',
     version: 2,
     triangles: 4100,
     materials: ['GL_Mat_Body', 'GL_Mat_Tire', 'GL_Mat_Glass', 'GL_Mat_Trim'],

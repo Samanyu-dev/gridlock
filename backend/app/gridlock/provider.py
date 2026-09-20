@@ -81,8 +81,10 @@ _INSTANCE: Optional[MotorsportDataProvider] = None
 def get_provider() -> MotorsportDataProvider:
     global _INSTANCE
     if _INSTANCE is None:
-        key = os.environ.get("MOTORSPORT_DATA_PROVIDER", "mock").lower()
-        cls = _provider_classes().get(key, MockMotorsportProvider)
+        key = os.environ.get("MOTORSPORT_DATA_PROVIDER", "openf1" if os.environ.get("VERCEL") else "mock").lower()
+        cls = _provider_classes().get(key)
+        if cls is None:
+            raise ValueError(f"Unknown motorsport data provider: {key}")
         _INSTANCE = cls()
     return _INSTANCE
 
