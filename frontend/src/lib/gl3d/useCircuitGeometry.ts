@@ -123,22 +123,33 @@ function buildKerbs(points: Vector3[], roadHalfWidth: number): BufferGeometry {
  * mesh / kerbs / markers from a manifest asset's real-world geometry —
  * every circuit renders through this one function, never bespoke per-track
  * geometry. */
+
+/** Centers a circuit's real centerline on the origin and scales it to a
+ * display-friendly radius — the same recentering principle as the car
+ * pipeline, extracted so both the full road-mesh geometry and lighter
+ * consumers (the qualifying grid, which only needs positions/tangents) do
+ * it identically without duplicating the math. Plain function, not a hook —
+ * safe to call conditionally. */
+export function projectCircuitPoints(asset: GLCircuitAsset, targetRadius = 5): { points: Vector3[]; scale: number } {
+  const raw = asset.geometry.centerline.map(([x, y, z]) => new Vector3(x, y, z))
+  const box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
+  for (const p of raw) {
+    box.minX = Math.min(box.minX, p.x); box.maxX = Math.max(box.maxX, p.x)
+    box.minZ = Math.min(box.minZ, p.z); box.maxZ = Math.max(box.maxZ, p.z)
+  }
+  const centerX = (box.minX + box.maxX) / 2
+  const centerZ = (box.minZ + box.maxZ) / 2
+  const spanX = box.maxX - box.minX
+  const spanZ = box.maxZ - box.minZ
+  const radius = Math.max(spanX, spanZ) / 2 || 1
+  const scale = targetRadius / radius
+  const points = raw.map((p) => new Vector3((p.x - centerX) * scale, p.y * scale, (p.z - centerZ) * scale))
+  return { points, scale }
+}
+
 export function useCircuitGeometry(asset: GLCircuitAsset, targetRadius = 5): CircuitGeometryData {
   return useMemo(() => {
-    const raw = asset.geometry.centerline.map(([x, y, z]) => new Vector3(x, y, z))
-    const box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity }
-    for (const p of raw) {
-      box.minX = Math.min(box.minX, p.x); box.maxX = Math.max(box.maxX, p.x)
-      box.minZ = Math.min(box.minZ, p.z); box.maxZ = Math.max(box.maxZ, p.z)
-    }
-    const centerX = (box.minX + box.maxX) / 2
-    const centerZ = (box.minZ + box.maxZ) / 2
-    const spanX = box.maxX - box.minX
-    const spanZ = box.maxZ - box.minZ
-    const radius = Math.max(spanX, spanZ) / 2 || 1
-    const scale = targetRadius / radius
-
-    const points = raw.map((p) => new Vector3((p.x - centerX) * scale, p.y * scale, (p.z - centerZ) * scale))
+    const { points, scale } = projectCircuitPoints(asset, targetRadius)
     const halfWidth = (asset.geometry.width * scale) / 2
 
     const curve = new CatmullRomCurve3(points, true, 'catmullrom', 0.4)

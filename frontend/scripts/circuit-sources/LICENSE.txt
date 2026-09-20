@@ -1,8 +1,15 @@
 Source: bacinger/f1-circuits — https://github.com/bacinger/f1-circuits
 License: MIT (Copyright (c) 2019-2025 Tomislav Bacinger)
 Files: monaco.geojson (circuits/mc-1929.geojson), silverstone.geojson
-(circuits/gb-1948.geojson), spa.geojson (circuits/be-1925.geojson) —
-fetched via the GitHub contents API on 2026-09-20.
+(circuits/gb-1948.geojson), spa.geojson (circuits/be-1925.geojson),
+albert-park (au-1953), shanghai (cn-2004), suzuka (jp-1962), bahrain
+(bh-2002), jeddah (sa-2021), miami (us-2022), imola (it-1953), barcelona
+(es-1991), gilles-villeneuve (ca-1978), red-bull-ring (at-1969),
+hungaroring (hu-1986), zandvoort (nl-1948), monza (it-1922), baku
+(az-2016), marina-bay (sg-2008), cota (us-2012), mexico-city (mx-1962),
+interlagos (br-1940), las-vegas (us-2023), lusail (qa-2004), yas-marina
+(ae-2009) — the full 2026 calendar's 24 circuits — fetched via the GitHub
+contents API on 2026-09-20.
 
 These are real, surveyed/traced track outlines (lon/lat LineStrings), not
 hand-drawn approximations. build-circuit-asset.mjs (in the parent

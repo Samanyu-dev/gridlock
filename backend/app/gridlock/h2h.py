@@ -12,7 +12,8 @@ from sqlmodel import Session, select
 
 from . import deadlines
 from .models import GLTeam
-from .snapshots import score_team_for_round
+from .ownership import ownership_round
+from .snapshots import resolve_team, score_team_for_round
 from .store import STORE
 
 
@@ -23,14 +24,23 @@ def _team_row(session: Session, profile_id: int) -> Optional[GLTeam]:
 def compare_season(session: Session, profile_a_id: int, profile_b_id: int) -> Optional[dict]:
     """Shared/differential picks, captains, season gap, and a round-by-round
     historical H2H record (assuming each side's current squad held all
-    season — the same assumption the real leaderboard already makes)."""
-    team_a = _team_row(session, profile_a_id)
-    team_b = _team_row(session, profile_b_id)
-    if not team_a or not team_a.driver_ids or not team_b or not team_b.driver_ids:
+    season — the same assumption the real leaderboard already makes).
+
+    Both sides are resolved to the latest *locked* round's picks, never the
+    live/still-changeable team — the same rule ownership() and live_battle()
+    already enforce, so a rival's unlocked future picks can never leak here
+    either. Bug fix: this previously read GLTeam directly, unconditionally
+    exposing a rival's current picks regardless of lock state."""
+    locked_round = ownership_round()
+    if locked_round is None:
+        return None
+    team_a = resolve_team(session, profile_a_id, locked_round)
+    team_b = resolve_team(session, profile_b_id, locked_round)
+    if not team_a or not team_b:
         return None
 
-    score_a = STORE.score_team(team_a.driver_ids, team_a.constructor_ids, team_a.captain_id)
-    score_b = STORE.score_team(team_b.driver_ids, team_b.constructor_ids, team_b.captain_id)
+    score_a = STORE.score_team(team_a["driver_ids"], team_a["constructor_ids"], team_a["captain_id"])
+    score_b = STORE.score_team(team_b["driver_ids"], team_b["constructor_ids"], team_b["captain_id"])
 
     rounds_a = rounds_b = ties = 0
     for rnd, pts_a in score_a["per_round"].items():
@@ -45,16 +55,16 @@ def compare_season(session: Session, profile_a_id: int, profile_b_id: int) -> Op
     return {
         "a": {
             "profile_id": profile_a_id, "total": score_a["total"], "last_race_points": score_a["last_race_points"],
-            "captain_id": team_a.captain_id, "driver_ids": team_a.driver_ids, "constructor_ids": team_a.constructor_ids,
-            "differentials": sorted(set(team_a.driver_ids) - set(team_b.driver_ids)),
+            "captain_id": team_a["captain_id"], "driver_ids": team_a["driver_ids"], "constructor_ids": team_a["constructor_ids"],
+            "differentials": sorted(set(team_a["driver_ids"]) - set(team_b["driver_ids"])),
         },
         "b": {
             "profile_id": profile_b_id, "total": score_b["total"], "last_race_points": score_b["last_race_points"],
-            "captain_id": team_b.captain_id, "driver_ids": team_b.driver_ids, "constructor_ids": team_b.constructor_ids,
-            "differentials": sorted(set(team_b.driver_ids) - set(team_a.driver_ids)),
+            "captain_id": team_b["captain_id"], "driver_ids": team_b["driver_ids"], "constructor_ids": team_b["constructor_ids"],
+            "differentials": sorted(set(team_b["driver_ids"]) - set(team_a["driver_ids"])),
         },
-        "shared_drivers": sorted(set(team_a.driver_ids) & set(team_b.driver_ids)),
-        "shared_constructors": sorted(set(team_a.constructor_ids) & set(team_b.constructor_ids)),
+        "shared_drivers": sorted(set(team_a["driver_ids"]) & set(team_b["driver_ids"])),
+        "shared_constructors": sorted(set(team_a["constructor_ids"]) & set(team_b["constructor_ids"])),
         "gap": round(score_a["total"] - score_b["total"], 1),
         "rounds_record": {"a": rounds_a, "b": rounds_b, "ties": ties},
     }

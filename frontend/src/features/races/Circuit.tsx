@@ -6,23 +6,12 @@ import { CircuitTrace } from './CircuitTrace'
 import { Skeleton, SprintBadge } from '../../components/bits'
 import { api } from '../../lib/api'
 import { flagEmoji, localTime, localWeekday, userTimezone } from '../../lib/format'
-import { getCircuitAsset } from '../../lib/gl3d/circuitManifest'
+import { getCircuitAssetForRace } from '../../lib/gl3d/circuitManifest'
 import type { Driver, Constructor, RaceFull } from '../../lib/types'
 
-// three.js/R3F only loads when this circuit actually has a 3D asset — most
-// circuits don't yet (only 3 are converted so far), so this stays a nested
-// lazy import rather than a top-level one.
+// three.js/R3F only loads when this circuit actually has a 3D asset, so
+// this stays a nested lazy import rather than a top-level one.
 const CircuitStage3D = lazy(() => import('../../components/gl3d').then((m) => ({ default: m.CircuitStage })))
-
-// The race's free-text circuit name matches the manifest asset's `name`
-// exactly (both come from the same real-world circuit identity) — a small
-// explicit lookup rather than fuzzy matching, since only 3 circuits exist
-// in the manifest so far.
-const CIRCUIT_ASSET_BY_NAME: Record<string, string> = {
-  'Circuit de Monaco': 'monaco',
-  'Silverstone Circuit': 'silverstone',
-  'Circuit de Spa-Francorchamps': 'spa-francorchamps',
-}
 
 export default function Circuit() {
   const { slug } = useParams()
@@ -39,8 +28,7 @@ export default function Circuit() {
   if (!r) return <div className="page container"><Skeleton h={220} /></div>
   const done = r.status === 'completed'
   const podium = r.classification.filter((c) => c.finish && c.finish <= 3)
-  const circuitAssetSlug = CIRCUIT_ASSET_BY_NAME[r.circuit]
-  const circuitAsset = circuitAssetSlug ? getCircuitAsset(circuitAssetSlug) : undefined
+  const circuitAsset = getCircuitAssetForRace(r.circuit)
 
   return (
     <div className="page">

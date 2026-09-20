@@ -8,3 +8,7 @@ export { useInteractionController, type InteractionState, type InteractionOption
 export { useSceneTransition } from './SceneTransition'
 export { CircuitModel, type CircuitModelProps } from './CircuitModel'
 export { CircuitStage, type CircuitCameraPreset } from './CircuitStage'
+export { QualifyingGridScene, type GridEntry, type GridFantasyState, type GridCameraTarget } from './QualifyingGridScene'
+export { InstancedMarkers, type MarkerInstance } from './InstancedMarkers'
+export { PodiumScene, type PodiumEntry } from './PodiumScene'
+export { CircuitRaceVisualizer, type RaceVisualizerDriver } from './CircuitRaceVisualizer'
