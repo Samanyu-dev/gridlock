@@ -11,7 +11,9 @@
   "routes": [
     { "src": "/api/(.*)", "dest": "api/index.py" },
     { "src": "/(assets/.*)", "dest": "/frontend/$1" },
-    { "src": "/(favicon\\.svg|manifest\\.webmanifest)", "dest": "/frontend/$1" },
+    { "src": "/(models/.*)", "dest": "/frontend/$1" },
+    { "src": "/(circuits/.*)", "dest": "/frontend/$1" },
+    { "src": "/(favicon\\.svg|manifest\\.webmanifest|registerSW\\.js|sw\\.js|workbox-.*\\.js)", "dest": "/frontend/$1" },
     { "src": "/(.*)", "dest": "/frontend/index.html" }
   ]
 }
