@@ -83,6 +83,7 @@ export interface GameConfig {
   rules: Record<string, unknown>; boosts: Boost[]
 }
 export interface Meta {
+  data_source?: string; data_status?: string; live_timing_available?: boolean
   season: number; product: string; provider: string; next_round: number; total_rounds: number
   next_race: Race | null; config: GameConfig; team_name_suggestions: string[]
   round_id: number; locked: boolean; deadline: string | null; last_synced_at: string | null

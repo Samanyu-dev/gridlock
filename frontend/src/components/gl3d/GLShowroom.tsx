@@ -1,6 +1,7 @@
+import { PCFShadowMap } from 'three'
 import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor, useProgress } from '@react-three/drei'
-import { Suspense, useCallback, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { CAMERA_PRESETS, type CameraPresetSpec } from './CameraRig'
 import { FallbackRenderer } from './FallbackRenderer'
 import { GLErrorBoundary } from './GLErrorBoundary'
@@ -43,6 +44,16 @@ export function GLShowroom({ fallbackImage, fallbackLabel, children, forceTier, 
   const [failed, setFailed] = useState(false)
   const [contextLost, setContextLost] = useState(false)
   const [dprBoost, setDprBoost] = useState(1)
+  const host = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  const [pageVisible, setPageVisible] = useState(!document.hidden)
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: '80px' })
+    if (host.current) observer.observe(host.current)
+    const onVisibility = () => setPageVisible(!document.hidden)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => { observer.disconnect(); document.removeEventListener('visibilitychange', onVisibility) }
+  }, [])
   const canvasEl = useRef<HTMLCanvasElement | null>(null)
 
   const onCreated = useCallback(({ gl }: { gl: { domElement: HTMLCanvasElement } }) => {
@@ -52,28 +63,27 @@ export function GLShowroom({ fallbackImage, fallbackLabel, children, forceTier, 
     el.addEventListener('webglcontextrestored', () => setContextLost(false))
   }, [])
 
-  if (tier === 'static' || failed || contextLost) {
-    return <FallbackRenderer image={fallbackImage} label={fallbackLabel} />
-  }
+  const staticOnly = tier === 'static' || failed || contextLost
 
   const [dprMin, dprMax] = TIER_DPR[tier]
-  const dpr: [number, number] = [dprMin, dprMax * dprBoost]
+  const dpr: [number, number] = [Math.min(dprMin, dprMax * dprBoost), dprMax * dprBoost]
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <Canvas
-        shadows={TIER_SHADOWS[tier]}
+    <div ref={host} style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {staticOnly ? <FallbackRenderer image={fallbackImage} label={fallbackLabel} /> : <Canvas
+        frameloop={visible && pageVisible ? 'always' : 'never'}
+        shadows={TIER_SHADOWS[tier] ? { type: PCFShadowMap } : false}
         dpr={dpr}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        gl={{ antialias: tier !== 'performance', powerPreference: 'high-performance' }}
         camera={{ position: initialCamera?.position ?? CAMERA_PRESETS.HERO.position, fov: initialCamera?.fov ?? CAMERA_PRESETS.HERO.fov, near: 0.1, far }}
         onCreated={onCreated}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'pan-y' }}
       >
         <PerformanceMonitor onDecline={() => setDprBoost(0.6)} onIncline={() => setDprBoost(1)} />
         <GLErrorBoundary onError={() => setFailed(true)}>
           <Suspense fallback={null}>{children}</Suspense>
         </GLErrorBoundary>
-      </Canvas>
+      </Canvas>}
       <LoadingOverlay image={fallbackImage} label={fallbackLabel} />
     </div>
   )

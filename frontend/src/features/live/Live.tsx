@@ -6,10 +6,11 @@ import { Skeleton, SprintBadge } from '../../components/bits'
 import { ShareButton } from '../../components/ShareButton'
 import { StateBadge } from '../../components/ScoreBreakdown'
 import { api } from '../../lib/api'
+import { useMeta } from '../../lib/meta'
 import { flagEmoji } from '../../lib/format'
 import { useSession } from '../../lib/session'
 import { getCircuitAssetForRace } from '../../lib/gl3d/circuitManifest'
-import type { LeaderboardRow, LeagueDetail, LiveBattleReport, Meta, MeResponse, OptimalTeamReport, OwnershipReport, RaceFull, WeekendScore } from '../../lib/types'
+import type { LeaderboardRow, LeagueDetail, LiveBattleReport, MeResponse, OptimalTeamReport, OwnershipReport, RaceFull, WeekendScore } from '../../lib/types'
 
 const DIFFERENTIAL_THRESHOLD = 20
 
@@ -22,7 +23,7 @@ const LiveRaceVisualizer3D = lazy(() => import('./LiveRaceVisualizer').then((m) 
 
 export default function Live() {
   const { authed } = useSession()
-  const [meta, setMeta] = useState<Meta | null>(null)
+  const meta = useMeta()
   const [me, setMe] = useState<MeResponse | null>(null)
   const [weekend, setWeekend] = useState<WeekendScore | null>(null)
   const [race, setRace] = useState<RaceFull | null>(null)
@@ -37,13 +38,18 @@ export default function Live() {
   const [optimal, setOptimal] = useState<OptimalTeamReport | null>(null)
 
   useEffect(() => {
-    api.meta().then((m) => {
-      setMeta(m)
-      const rid = m.next_round
-      api.teamScore(rid).then(setWeekend).catch(() => {})
-      api.leaderboardRound(rid, { limit: 5 }).then((r) => setRound(r.entries)).catch(() => {})
-      if (m.next_race) api.race(m.next_race.slug).then(setRace).catch(() => {})
-    }).catch(() => {})
+    if (!meta) return
+    let cancelled = false
+    const rid = meta.next_round
+    if (authed) {
+      api.teamScore(rid).then((v) => { if (!cancelled) setWeekend(v) }).catch(() => {})
+      api.leaderboardRound(rid, { limit: 5 }).then((v) => { if (!cancelled) setRound(v.entries) }).catch(() => {})
+    }
+    if (meta.next_race) api.race(meta.next_race.slug).then((v) => { if (!cancelled) setRace(v) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [meta, authed])
+
+  useEffect(() => {
     if (authed) {
       api.me().then(setMe).catch(() => {})
       api.leagues().then((r) => {
@@ -86,11 +92,12 @@ export default function Live() {
   return (
     <div className="page">
       <div className="container">
+        {meta.live_timing_available === false && <div className="feed-notice" role="status"><Radio size={16} /><div><strong>Results centre</strong><p>Live timing is not connected. Scores refresh from available results; no simulated positions or lap-by-lap points.{meta.data_source === 'jolpica' && ' Backup source: Jolpica. Weather and pit-stop bonuses are unavailable.'}</p></div></div>}
         {/* Weekend header */}
         <div className="panel" style={{ overflow: 'hidden', marginBottom: 16 }}>
           <div className="row between wrap gap-2" style={{ padding: 20, background: 'linear-gradient(120deg, rgba(255,33,48,0.12), transparent 55%)' }}>
             <div className="row gap-3">
-              {state === 'LIVE' && <span className="chip chip-live" style={{ fontSize: 13 }}><span className="dot" />LIVE</span>}
+              {state === 'LIVE' && meta.live_timing_available && <span className="chip chip-live" style={{ fontSize: 13 }}><span className="dot" />LIVE</span>}
               <div>
                 <h1 className="display row gap-2" style={{ fontSize: 30, alignItems: 'center' }}>{flagEmoji(nr?.country)} {nr?.name ?? 'Season complete'}{nr?.is_sprint && <SprintBadge size="md" />}</h1>
                 <span className="text-dim">{nr?.circuit} · {nr?.weather}</span>

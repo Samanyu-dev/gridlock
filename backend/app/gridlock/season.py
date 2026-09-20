@@ -237,6 +237,7 @@ class Season:
     races: List[Race]
     next_round: int
     engine: FantasyScoringEngine
+    source: str = "unknown"
 
     @property
     def next_race(self) -> Optional[Race]:

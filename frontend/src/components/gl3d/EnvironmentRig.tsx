@@ -1,4 +1,4 @@
-import { ContactShadows } from '@react-three/drei'
+import { ContactShadows, Environment, Lightformer } from '@react-three/drei'
 import { Fog } from 'three'
 import { useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
@@ -18,6 +18,15 @@ export function EnvironmentRig({ background = '#05060a', shadows = true }: { bac
   return (
     <>
       <color attach="background" args={[background]} />
+      <Environment resolution={128} frames={1}>
+        <Lightformer intensity={3} position={[0, 5, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[8, 2, 1]} />
+        <Lightformer intensity={2} position={[-5, 2, 0]} rotation={[0, Math.PI / 2, 0]} scale={[6, 1, 1]} />
+        <Lightformer intensity={1.5} color="#b8d6ff" position={[4, 3, -3]} rotation={[0, -Math.PI / 4, 0]} scale={[4, 2, 1]} />
+      </Environment>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.025, 0]} receiveShadow>
+        <circleGeometry args={[8, 64]} />
+        <meshStandardMaterial color="#0b0e14" roughness={0.4} metalness={0.35} />
+      </mesh>
       {shadows && (
         <ContactShadows position={[0, -0.01, 0]} opacity={0.55} scale={10} blur={2.2} far={4} resolution={512} color="#000000" />
       )}

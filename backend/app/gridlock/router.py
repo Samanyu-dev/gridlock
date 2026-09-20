@@ -9,7 +9,7 @@ import statistics
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from ..database import get_session
@@ -277,12 +277,14 @@ def _race_full(r) -> dict:
 
 
 @router.get("/meta")
-def meta():
+def meta(background_tasks: BackgroundTasks):
     s = STORE.season
     nr = s.next_race
     round_id = deadlines.active_round()
     provider = get_provider()
     ph = provider.health()
+    if hasattr(provider, "refresh_if_stale"):
+        background_tasks.add_task(provider.refresh_if_stale)
     return {
         "season": s.year,
         "product": "GRIDLOCK",
@@ -296,6 +298,9 @@ def meta():
         "locked": deadlines.is_locked(round_id),
         "deadline": _iso(deadlines.deadline_for_round(round_id)) if deadlines.deadline_for_round(round_id) else None,
         "last_synced_at": ph.get("last_synced_at"),
+        "data_source": ph.get("data_source", provider.name),
+        "data_status": "stale" if ph.get("last_error") else "available",
+        "live_timing_available": False,
     }
 
 

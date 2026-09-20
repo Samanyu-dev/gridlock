@@ -77,4 +77,4 @@ def round_state(race, at: Optional[datetime] = None) -> str:
         return "LIVE"
     if start and now <= start + LIVE_WINDOW + PROVISIONAL_WINDOW:
         return "PROVISIONAL"
-    return "FINAL" if race.status == "completed" else "PROVISIONAL"
+    return "FINAL" if race.classification else "PROVISIONAL"

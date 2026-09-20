@@ -30,6 +30,7 @@ function detectTier(): PerformanceTier {
     renderer = ''
   }
   const weakGpu = /swiftshader|llvmpipe|software/.test(renderer)
+  gl.getExtension('WEBGL_lose_context')?.loseContext()
   if (weakGpu) return 'static'
 
   if (isMobile) return cores >= 6 && mem >= 6 ? 'high' : 'performance'
@@ -40,13 +41,13 @@ function detectTier(): PerformanceTier {
  * GLShowroom uses this to decide whether to mount a <Canvas> at all
  * ("static" never does), and to scale DPR/shadow quality within it. */
 export function usePerformanceTier(): PerformanceTier {
-  const [tier, setTier] = useState<PerformanceTier>('performance')
+  const [tier, setTier] = useState<PerformanceTier>('static')
   useEffect(() => { setTier(detectTier()) }, [])
   return tier
 }
 
 export const TIER_DPR: Record<PerformanceTier, [number, number]> = {
-  ultra: [1, 2],
+  ultra: [1, 1.5],
   high: [1, 1.5],
   performance: [1, 1],
   static: [1, 1],

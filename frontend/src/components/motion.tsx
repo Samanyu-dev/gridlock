@@ -12,6 +12,7 @@ export function CountUp({ value, duration = 800, decimals = 0, prefix = '', suff
   useEffect(() => {
     const from = fromRef.current
     const to = value
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || duration <= 0) { setDisplay(to); fromRef.current = to; return }
     if (from === to) { setDisplay(to); return }
     const start = performance.now()
     const tick = (now: number) => {

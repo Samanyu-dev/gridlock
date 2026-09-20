@@ -12,7 +12,7 @@ every attribute. The pure helpers are unit-tested with fixture payloads.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 from .scoring import (
@@ -169,6 +169,13 @@ def _winner(dr: Dict[int, DriverRaceResult]) -> Optional[int]:
 def _fetch_weekend(client, weekend: List[dict], race_sess: dict) -> dict:
     """All the raw OpenF1 data one Grand Prix weekend needs, in one call — run
     across weekends concurrently by the caller."""
+    start = _parse_dt(race_sess.get("date_start"))
+    if start and start > datetime.now(UTC) and all(
+        (_parse_dt(s.get("date_start")) or start) > datetime.now(UTC) for s in weekend
+    ):
+        return {"results": {}, "grid": {}, "quali": {}, "has_results": False,
+                "fl": None, "pits": {}, "weather": [], "sprint_results": {},
+                "sprint_grid": {}, "sprint_quali": {}}
     skey = race_sess.get("session_key")
     results = {r.get("driver_number"): r for r in client.session_result(session_key=skey)}
     grid = {g.get("driver_number"): g.get("position") for g in client.starting_grid(session_key=skey)}
@@ -300,12 +307,12 @@ def normalize_season(client, year: int) -> Optional[Season]:
         # "Completed" means the calendar date has passed — never whether the
         # results happened to be present, so a data gap on one round (OpenF1
         # occasionally has one) doesn't make a past race look "upcoming".
-        status = "completed" if start < now else "upcoming"
+        status = "completed" if start + timedelta(hours=2, minutes=30) < now else "live" if start <= now else "upcoming"
         if status == "completed":
             elapsed += 1
         if has_results:
             with_data += 1
-            dotd_id = _driver_of_the_day(dr)
+            dotd_id = None
             for num, result in dr.items():
                 mate = _teammate(num, drivers, dr)
                 bd = engine.score_driver(result, teammate=mate)
@@ -335,7 +342,7 @@ def normalize_season(client, year: int) -> Optional[Season]:
                 c.round_points[rnd] = cbd.total
                 c.round_breakdown[rnd] = cbd.items
 
-        country_iso2 = _ISO3_TO_ISO2.get(meeting.get("country_code") or "", "XX")
+        country_iso2 = meeting.get("country_iso2") or _ISO3_TO_ISO2.get(meeting.get("country_code") or "", "XX")
         circuit_name = race_sess.get("circuit_short_name") or ""
         laps, length_km = _CIRCUIT_INFO.get(circuit_name, (56, 5.20))
         weather = weather_label(data["weather"]) if has_results else "—"
@@ -346,16 +353,16 @@ def normalize_season(client, year: int) -> Optional[Season]:
             location=race_sess.get("location") or circuit_name, country=country_iso2,
             circuit=circuit_name, laps=laps, length_km=length_km, is_sprint=is_sprint,
             race_start=start, deadline=start, weather=weather, status=status,
-            sessions=[RaceSession("RACE", "Grand Prix", start)],
+            sessions=[RaceSession({"Race": "RACE", "Qualifying": "QUALI", "Sprint": "SPRINT", "Sprint Qualifying": "SQ", "Practice 1": "FP1", "Practice 2": "FP2", "Practice 3": "FP3"}.get(sess.get("session_name"), "SESSION"), sess.get("session_name", "Session"), _parse_dt(sess["date_start"])) for sess in weekend if _parse_dt(sess.get("date_start"))],
             winner_id=_winner(dr), fastest_lap_id=fl,
             classification=_classification(dr, drivers, constructors) if has_results else [],
-            quali=_quali_rows(quali, drivers, constructors) if quali else [],
+            quali=_quali_rows({n:p for n,p in quali.items() if n in drivers}, drivers, constructors) if quali else [],
             sprint_classification=_classification(sprint_dr, drivers, constructors) if sprint_dr and has_results else [],
-            sprint_quali=_quali_rows(sprint_quali, drivers, constructors) if sprint_quali else [],
+            sprint_quali=_quali_rows({n:p for n,p in sprint_quali.items() if n in drivers}, drivers, constructors) if sprint_quali else [],
             circuit_image_url=meeting.get("circuit_image") or "",
         ))
 
-    if with_data == 0:
+    if not races:
         return None
     _finalize_metrics(drivers, constructors, completed_rounds=max(1, elapsed))
     # First race whose date hasn't happened yet — based on the calendar, never

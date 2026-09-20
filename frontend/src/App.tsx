@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, MotionConfig } from 'framer-motion'
 import type { ReactNode } from 'react'
 import { SessionProvider, useSession } from './lib/session'
 import { MetaProvider } from './lib/meta'
@@ -86,10 +86,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <SessionProvider>
+    <MotionConfig reducedMotion="user"><SessionProvider>
       <MetaProvider>
         <AppRoutes />
       </MetaProvider>
-    </SessionProvider>
+    </SessionProvider></MotionConfig>
   )
 }

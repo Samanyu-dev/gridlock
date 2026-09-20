@@ -369,3 +369,10 @@ class GLLedgerAudit(SQLModel, table=True):
     detected_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     reason: str = ""
     run_id: Optional[int] = Field(default=None, foreign_key="ms_data_sync_run.id", index=True)
+
+
+class GLFeedCache(SQLModel, table=True):
+    __tablename__ = 'gl_feed_cache'
+    key: str = Field(primary_key=True)
+    payload: dict = Field(sa_column=Column(JSON))
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

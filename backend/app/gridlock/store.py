@@ -9,6 +9,7 @@ these demo managers.
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -78,7 +79,11 @@ class GameStore:
         # The provider owns caching/TTL/reconciliation — GameStore must not
         # add a second, permanent cache on top or a stale season would never
         # get the chance to refresh.
-        return get_provider().get_season()
+        season = get_provider().get_season()
+        current = now()
+        races = [replace(r, status='upcoming' if current < r.race_start else 'live' if current <= r.race_start + timedelta(hours=2, minutes=30) else 'completed') for r in season.races]
+        active = next((r.round for r in races if r.status != 'completed'), season.next_round)
+        return replace(season, races=races, next_round=active)
 
     def resync(self) -> Season:
         """Force a full, deterministic rebuild from the live feed right now."""

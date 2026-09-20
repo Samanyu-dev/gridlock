@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowRight, Check, Circle, Sparkles, Flag, TrendingUp } from 'lucide-react'
 import { Countdown, CountUp } from '../../components/motion'
 import { Avatar, Skeleton } from '../../components/bits'
 import { ScoreBreakdown } from '../../components/ScoreBreakdown'
-import { SpeedBackground } from '../../components/SpeedBackground'
 import { CircuitTrace } from '../races/CircuitTrace'
 import { api } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { useMeta } from '../../lib/meta'
 import { flagEmoji, money } from '../../lib/format'
 import type { Driver, Constructor, Insight, LeagueSummary, MeResponse } from '../../lib/types'
+
+const HeroCarScene = lazy(() => import('../landing/HeroCarScene').then(m => ({ default: m.HeroCarScene })))
 
 export default function Dashboard() {
   const { authed, profile } = useSession()
@@ -49,12 +50,12 @@ export default function Dashboard() {
         {/* Hero — cinematic, rounded, floating overview card (reference composition) */}
         <motion.section className="hero-frame" style={{ marginBottom: 20 }}
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="hero-frame__media"><SpeedBackground intensity={1.15} /></div>
+          <div className="hero-frame__media"><Suspense fallback={null}><HeroCarScene /></Suspense></div>
           <div className="hero-frame__scrim" />
           <div className="hero-frame__content">
             <div className="row between wrap gap-2">
               <span className="eyebrow" style={{ color: 'var(--text-dim)' }}>Next Race · Round {nr?.round}</span>
-              <span className="live-pill"><span className="dot" /> Race Week</span>
+              <span className="chip">{nr?.round_state ?? 'Loading schedule'}</span>
             </div>
             <div style={{ marginTop: 'auto' }}>
               <span className="text-dim" style={{ fontSize: 15 }}>{flagEmoji(nr?.country)} {nr?.location}{nr ? `, ${nr.country_name}` : ''}</span>

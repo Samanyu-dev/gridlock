@@ -8,8 +8,7 @@ works. Selected with ``MOTORSPORT_DATA_PROVIDER=openf1``.
 OpenF1 (https://openf1.org/) is a free, key-less REST API for historical data;
 realtime access may require a subscription. Network access and endpoint coverage
 vary by environment, so this provider is defensive: on any fetch/parse failure it
-records the failure and falls back to the seeded season rather than crashing the
-app. All normalization tolerates missing fields (not every historical session
+records the failure and retains the last real snapshot. All normalization tolerates missing fields (not every historical session
 carries every field).
 
 Endpoints used (all GET, JSON):
@@ -21,18 +20,21 @@ from __future__ import annotations
 import json
 import os
 import time
+import threading
+from fastapi import HTTPException
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 from typing import List, Optional
 from urllib.parse import urlencode
 
 from .provider import MotorsportDataProvider
-from .season import Season, build_season
+from .season import Season
 
 UTC = timezone.utc
 OPENF1_BASE = os.environ.get("OPENF1_BASE_URL", "https://api.openf1.org/v1")
 OPENF1_TOKEN = os.environ.get("OPENF1_API_KEY")  # only needed for realtime
-HTTP_TIMEOUT = float(os.environ.get("OPENF1_TIMEOUT", "12"))
+HTTP_TIMEOUT = float(os.environ.get("OPENF1_TIMEOUT", "8"))
 # How long a built season is trusted before the next request triggers a full
 # rebuild from OpenF1. A rebuild is a deterministic recompute from whatever
 # OpenF1 currently reports — this *is* the reconciliation mechanism: if a
@@ -47,6 +49,10 @@ class OpenF1Client:
     def __init__(self, base: str = OPENF1_BASE, token: Optional[str] = OPENF1_TOKEN) -> None:
         self.base = base.rstrip("/")
         self.token = token
+        self._http_lock = threading.Lock()
+        self._last_request = 0.0
+        self._responses = {}
+        self._loaded = False
 
     def get(self, path: str, **params) -> List[dict]:
         qs = urlencode({k: v for k, v in params.items() if v is not None})
@@ -54,21 +60,33 @@ class OpenF1Client:
         if qs:
             url += f"?{qs}"
         req = urllib.request.Request(url, headers=self._headers())
-        # The sandbox is flaky: the same query sometimes comes back empty, then
-        # returns the real rows moments later. Retry a couple times before
-        # treating an empty response as "no data" rather than "try again".
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:  # noqa: S310 (trusted host)
-                    data = json.loads(resp.read().decode("utf-8"))
-                    rows = data if isinstance(data, list) else [data]
-                    if rows or attempt == 2:
-                        return rows
-            except Exception:
-                if attempt == 2:
-                    return []
-            time.sleep(0.4 * (attempt + 1))
-        return []
+        # OpenF1's free tier is limited to 30 requests/minute. Persist raw
+        # responses so refreshes mostly reuse history instead of replaying it.
+        with self._http_lock:
+            if not self._loaded:
+                from .feed_cache import load_raw
+                self._responses = load_raw()
+                self._loaded = True
+            cached = self._responses.get(url)
+            ttl = 300 if path in ('meetings', 'sessions') else 21600
+            if cached and time.time() - cached['at'] < ttl:
+                return cached['rows']
+            gap = max(0, 2.1 - (time.monotonic() - self._last_request))
+            if gap:
+                time.sleep(gap)
+            self._last_request = time.monotonic()
+            # An HTTP failure is not an empty classification. Abort the
+            # refresh and retain the last known-good season.
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            rows = data if isinstance(data, list) else [data]
+            self._responses[url] = {'at': time.time(), 'rows': rows}
+            return rows
+
+    def persist(self):
+        from .feed_cache import save_raw
+        if self._loaded:
+            save_raw(self._responses)
 
     def _headers(self) -> dict:
         h = {"Accept": "application/json", "User-Agent": "GRIDLOCK/1.0"}
@@ -91,8 +109,7 @@ class OpenF1Client:
 
 
 class OpenF1Provider(MotorsportDataProvider):
-    """Live/historical provider. Falls back to the seeded season if OpenF1 is
-    unreachable, so the product never hard-fails on a data outage."""
+    """Live/historical provider with durable real-data caching."""
 
     name = "openf1"
     live = True
@@ -107,17 +124,37 @@ class OpenF1Provider(MotorsportDataProvider):
         self.last_sync_source: str = "none"  # "openf1" or "fallback"
         self.sync_count: int = 0
         self.last_reconciled_changes: int = 0
+        self._sync_lock = threading.Lock()
+        self._cache_loaded = False
 
     def get_season(self, force: bool = False) -> Season:
-        stale = (
-            self._season is None
-            or self.last_synced_at is None
-            or (datetime.now(UTC) - self.last_synced_at).total_seconds() > SEASON_CACHE_TTL
-        )
-        if not force and not stale:
+        if self._season is not None and not force:
             return self._season
-        self._sync()
-        return self._season
+        with self._sync_lock:
+            if not self._cache_loaded:
+                from .feed_cache import load
+                cached = load(self.year)
+                if cached:
+                    self._season, self.last_synced_at = cached
+                    self.last_sync_source = 'persistent-cache'
+                self._cache_loaded = True
+            if force or self._season is None:
+                self._sync()
+            if self._season is None:
+                raise HTTPException(503, 'Race data is temporarily unavailable. Please retry shortly.')
+            return self._season
+
+    def refresh_if_stale(self):
+        # FastAPI runs this after sending /meta. Cached reads never wait for
+        # the refresh; the lock prevents concurrent reconciliations per worker.
+        if not self._sync_lock.acquire(blocking=False):
+            return
+        try:
+            anchor = getattr(self, '_last_attempt', None) or self.last_synced_at
+            if anchor is None or (datetime.now(UTC) - anchor).total_seconds() > SEASON_CACHE_TTL:
+                self._sync()
+        finally:
+            self._sync_lock.release()
 
     def _sync(self) -> None:
         """One deterministic recompute from whatever OpenF1 reports right
@@ -131,22 +168,38 @@ class OpenF1Provider(MotorsportDataProvider):
         changes = 0
         try:
             from .normalize import normalize_season
-            season = normalize_season(self.client, self.year)
+            source = 'openf1'
+            try:
+                season = normalize_season(self.client, self.year)
+            except Exception:
+                # Never replace an existing full snapshot with a less complete
+                # provider. Backup is only for bootstrapping an empty cache.
+                if self._season is not None:
+                    raise
+                from .jolpica import JolpicaClient
+                season = normalize_season(JolpicaClient(self.year), self.year)
+                source = 'jolpica'
+
             if season is None:
                 raise RuntimeError("OpenF1 returned no usable data")
+            season.source = source
             self._season = season
+            from .feed_cache import save
+            save(season)
             self.last_error = None
-            self.last_sync_source = "openf1"
+            self.last_sync_source = source
             changes = reconcile(season, run_id)
             finish_run(run_id, "ok", changes)
         except Exception as exc:  # defensive: never crash the app on a data issue
             self.last_error = str(exc)
             finish_run(run_id, "failed", 0, error=str(exc))
-            if self._season is None:
-                self._season = build_season()  # seeded fallback keeps the app alive
-                self.last_sync_source = "fallback"
+            # Keep the last real snapshot; never invent a seeded season.
+            self.last_sync_source = "stale-cache" if self._season else "unavailable"
+        self.client.persist()
         self.last_sync_duration = round(time.monotonic() - t0, 2)
-        self.last_synced_at = datetime.now(UTC)
+        self._last_attempt = datetime.now(UTC)
+        if self.last_error is None:
+            self.last_synced_at = self._last_attempt
         self.last_reconciled_changes = changes
         self.sync_count += 1
 
@@ -157,6 +210,7 @@ class OpenF1Provider(MotorsportDataProvider):
         rounds_elapsed = sum(1 for r in s.races if r.status == "completed") if s else 0
         return {
             "provider": self.name,
+            "data_source": s.source if s else None,
             "season_year": self.year,
             "last_synced_at": self.last_synced_at.isoformat() if self.last_synced_at else None,
             "last_sync_duration_seconds": self.last_sync_duration,

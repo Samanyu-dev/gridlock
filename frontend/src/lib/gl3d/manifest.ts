@@ -41,13 +41,13 @@ export const GL3D_MANIFEST: Record<string, GL3DAsset> = {
     id: 'gridlock-car-dev',
     type: 'car',
     model: {
-      high: '/models/cars/gridlock-master-car/high.glb',
-      medium: '/models/cars/gridlock-master-car/medium.glb',
-      low: '/models/cars/gridlock-master-car/low.glb',
+      high: '/models/cars/gridlock-formula/high.glb',
+      medium: '/models/cars/gridlock-formula/medium.glb',
+      low: '/models/cars/gridlock-formula/low.glb',
     },
-    fallbackImage: '/models/cars/gridlock-master-car/fallback.svg',
-    version: 1,
-    triangles: 1430,
+    fallbackImage: '/models/cars/gridlock-formula/fallback.svg',
+    version: 2,
+    triangles: 4100,
     materials: ['GL_Mat_Body', 'GL_Mat_Tire', 'GL_Mat_Glass', 'GL_Mat_Trim'],
     meshNames: {
       GL_Car_Root: 'root',
@@ -58,14 +58,15 @@ export const GL3D_MANIFEST: Record<string, GL3DAsset> = {
       GL_Car_Wheel_RR: 'wheel_rear_right',
     },
     license: {
-      source: 'Kenney "Racing Kit" (kenney.nl/assets/racing-kit), CC0 1.0',
+      source: 'Original GRIDLOCK concept, generated in this repository',
       commercialUse: true,
     },
-    // Placeholder body shape (generic low-poly racer, not an authentic
-    // open-wheel silhouette) — real geometry/materials/LODs pipeline,
-    // swap the three GLBs + fallback and bump `version` when a final
-    // car is ready. See LICENSE.txt next to the model files.
-    status: 'draft',
+    // Procedurally generated original open-wheel silhouette (wings, halo,
+    // suspension struts, 3 LOD tiers) — no third-party geometry or
+    // textures, see frontend/scripts/build-formula-car.mjs and the
+    // model directory's LICENSE.txt. Swap the three GLBs + fallback and
+    // bump `version` if a higher-fidelity car replaces this one.
+    status: 'approved',
   },
 }
 

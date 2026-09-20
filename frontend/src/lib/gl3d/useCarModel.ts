@@ -1,7 +1,7 @@
 import { useGLTF } from '@react-three/drei'
 import { useMemo } from 'react'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { Color, Mesh, MeshStandardMaterial, type Group } from 'three'
+import { Color, Mesh, MeshStandardMaterial, MeshPhysicalMaterial, type Group } from 'three'
 import { getModelUrl, type GL3DAsset, type ModelQuality } from './manifest'
 
 export interface CarModel {
@@ -27,15 +27,20 @@ export function useCarModel(asset: GL3DAsset, quality: ModelQuality = 'medium', 
     const scene = cloneSkeleton(gltf.scene) as Group
     const find = (name: string) => scene.getObjectByName(name) as Group | undefined
 
-    if (bodyColor) {
-      scene.traverse((obj) => {
-        if (obj instanceof Mesh && obj.name === 'GL_Car_Body' && obj.material instanceof MeshStandardMaterial) {
-          const tinted = obj.material.clone()
-          tinted.color = new Color(bodyColor)
-          obj.material = tinted
-        }
-      })
-    }
+    scene.traverse((obj) => {
+      if (!(obj instanceof Mesh)) return
+      obj.castShadow = true
+      if (obj.name === 'GL_Car_Body' && obj.material instanceof MeshStandardMaterial) {
+        const paint = new MeshPhysicalMaterial()
+        MeshStandardMaterial.prototype.copy.call(paint, obj.material)
+        paint.color = new Color(bodyColor ?? '#ff3045')
+        paint.metalness = 0.55
+        paint.roughness = 0.28
+        paint.clearcoat = 1
+        paint.clearcoatRoughness = 0.18
+        obj.material = paint
+      }
+    })
 
     return {
       scene,

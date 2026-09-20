@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CountUp } from './motion'
 import { ChevronDown } from 'lucide-react'
 import type { LedgerEntry, WeekendScore } from '../lib/types'
 
@@ -41,6 +42,9 @@ export function StateBadge({ state }: { state: string }) {
 export function ScoreBreakdown({ weekend }: { weekend: WeekendScore }) {
   const [open, setOpen] = useState<string | null>(weekend.assets[0]?.ref ?? null)
   const m = STATE_META[weekend.state] || STATE_META.provisional
+  const awarded = weekend.assets.reduce((sum, a) => sum + Math.max(0, a.subtotal), 0)
+  const deductions = weekend.assets.reduce((sum, a) => sum + Math.min(0, a.subtotal), 0)
+  const adjustments = weekend.total - awarded - deductions
 
   return (
     <div className="panel panel-pad">
@@ -50,15 +54,21 @@ export function ScoreBreakdown({ weekend }: { weekend: WeekendScore }) {
       </div>
       <div className="row between" style={{ marginBottom: 14 }}>
         <span className="text-faint" style={{ fontSize: 12 }}>{m.note}{weekend.from_snapshot ? ' · from your locked team' : ''}</span>
-        <span className="display" style={{ fontSize: 30 }}>{weekend.total}</span>
+        <span className="score-total" aria-label={`${weekend.total} points`}><CountUp value={weekend.total} duration={450} decimals={1} /><small>PTS</small></span>
       </div>
 
+      <div className="score-summary" aria-label="Score reconciliation">
+        <div><span>Positive asset scores</span><strong className="text-gain">+{awarded.toFixed(1)}</strong></div>
+        <div><span>Negative asset scores</span><strong className="text-loss">{deductions.toFixed(1)}</strong></div>
+        <div><span>Team adjustments</span><strong>{adjustments > 0 ? '+' : ''}{adjustments.toFixed(1)}</strong></div>
+      </div>
+      {weekend.assets.length === 0 && <p className="text-dim">No scored results for this round yet. Points appear when results are available.</p>}
       <div className="col gap-1">
         {weekend.assets.map((a) => {
           const isOpen = open === a.ref
           return (
             <div key={a.ref} className="panel" style={{ overflow: 'hidden', background: 'var(--surface-2)' }}>
-              <button onClick={() => setOpen(isOpen ? null : a.ref)}
+              <button aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : a.ref)}
                 className="row between race-edge" style={{ ['--accent' as string]: a.color, width: '100%', background: 'transparent', border: 'none', color: 'var(--text)', padding: '10px 14px', cursor: 'pointer' }}>
                 <span className="row gap-2">
                   <ChevronDown size={14} style={{ transform: isOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', color: 'var(--text-faint)' }} />

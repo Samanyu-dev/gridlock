@@ -21,7 +21,7 @@ async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as Record<string, string>) }
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`/api${path}`, { ...options, headers })
+  const res = await fetch(`/api${path}`, { ...options, headers, cache: 'no-store', signal: options.signal ?? AbortSignal.timeout(20000) })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.detail || `Request failed: ${res.status}`)

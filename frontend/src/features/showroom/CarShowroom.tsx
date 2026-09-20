@@ -22,7 +22,7 @@ export default function CarShowroom() {
           </span>
         </div>
 
-        <div className="page-head"><span className="eyebrow">Phase 3C testing ground</span><h1 className="page-title">Car Showroom</h1></div>
+        <div className="page-head"><span className="eyebrow">GRIDLOCK design studio</span><h1 className="page-title">Car Showroom</h1></div>
 
         <div className="panel" style={{ overflow: 'hidden', height: 520, position: 'relative' }}>
           <GLShowroom fallbackImage={asset.fallbackImage} fallbackLabel="GRIDLOCK master car">
@@ -46,11 +46,9 @@ export default function CarShowroom() {
           </div>
         </div>
 
-        <div className="grid g4" style={{ marginTop: 16 }}>
-          <div className="panel stat"><div className="k">Triangles</div><div className="v" style={{ fontSize: 20 }}>{asset.triangles?.toLocaleString()}</div></div>
-          <div className="panel stat"><div className="k">Materials</div><div className="v" style={{ fontSize: 20 }}>{asset.materials?.length}</div></div>
-          <div className="panel stat"><div className="k">Version</div><div className="v" style={{ fontSize: 20 }}>v{asset.version}</div></div>
-          <div className="panel stat"><div className="k">License</div><div className="v" style={{ fontSize: 13 }}>{asset.license.source.split('(')[0].trim()}</div></div>
+        <div className="panel panel-pad" style={{ marginTop: 16 }}>
+          <span className="eyebrow">An original open-wheel concept</span>
+          <p className="text-dim">Explore the form from six camera angles. Drag horizontally to turn the car, or scroll to zoom. This is an unbranded GRIDLOCK concept, not an official team car.</p>
         </div>
       </div>
     </div>

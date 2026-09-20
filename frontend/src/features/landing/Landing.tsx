@@ -7,9 +7,10 @@ import { RacingLine } from '../../components/RacingLine'
 import { Countdown, CountUp } from '../../components/motion'
 import { Avatar, Delta } from '../../components/bits'
 import { api } from '../../lib/api'
+import { useMetaStatus } from '../../lib/meta'
 import { useSession } from '../../lib/session'
 import { flagEmoji, money } from '../../lib/format'
-import type { Driver, LeaderboardRow, Meta } from '../../lib/types'
+import type { Driver, LeaderboardRow } from '../../lib/types'
 
 // three.js + R3F are heavy — split into their own chunk so every visitor to
 // "/" (including ones who never see the hero render) doesn't pay for it in
@@ -19,15 +20,14 @@ const HeroCarScene = lazy(() => import('./HeroCarScene').then((m) => ({ default:
 export default function Landing() {
   const navigate = useNavigate()
   const { authed } = useSession()
-  const [meta, setMeta] = useState<Meta | null>(null)
+  const { meta, error: feedError } = useMetaStatus()
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [board, setBoard] = useState<LeaderboardRow[]>([])
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     if (authed) { navigate('/home'); return }
-    api.meta().then(setMeta).catch(() => {})
-    api.drivers({ sort: 'points' }).then((r) => setDrivers(r.drivers.slice(0, 6))).catch(() => {})
+    api.drivers({ sort: 'points' }).then((r) => setDrivers(r.drivers.slice(0, 4))).catch(() => {})
     api.leaderboard({ limit: 4 }).then((r) => setBoard(r.entries)).catch(() => {})
   }, [authed, navigate])
 
@@ -63,22 +63,15 @@ export default function Landing() {
 
       {/* Hero */}
       <section style={{ position: 'relative', overflow: 'hidden', minHeight: '82vh', display: 'flex', alignItems: 'center' }}>
-        <div style={{ position: 'absolute', inset: 0, background: '#05060a' }} aria-hidden>
-          <Suspense fallback={null}>
-            <HeroCarScene />
-          </Suspense>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(8,9,11,.35) 0%, rgba(8,9,11,.55) 55%, var(--bg) 100%)' }} />
-        </div>
-        <div className="container" style={{ position: 'relative', padding: '48px 20px 40px', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 40, alignItems: 'center' }}>
+        <div className="container landing-hero-layout" style={{ position: 'relative', padding: '48px 20px 40px', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 40, alignItems: 'center' }}>
           <div>
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <span className="chip" style={{ marginBottom: 20 }}>Season {meta?.season ?? 2026} · Free to play</span>
-              <h1 className="display" style={{ fontSize: 'clamp(44px, 8vw, 92px)', margin: '10px 0' }}>
+              <h1 className="display" style={{ fontSize: 'clamp(44px, 5.5vw, 76px)', margin: '10px 0' }}>
                 Build your grid.<br /><span style={{ color: 'var(--red)' }}>Own the weekend.</span>
               </h1>
               <p className="text-dim" style={{ fontSize: 18, maxWidth: 480, lineHeight: 1.5, marginBottom: 28 }}>
-                Draft ten drivers and two constructors under a $300M budget. Score every practice,
-                qualifying and race. Make the transfers, call the boosts, and climb from the paddock
+                Draft ten drivers and two constructors under a $300M budget. Score qualifying, sprint and race results. Make the transfers, call the boosts, and climb from the paddock
                 to the top of the global grid.
               </p>
               <div className="row gap-2 wrap">
@@ -88,12 +81,17 @@ export default function Landing() {
             </motion.div>
           </div>
 
-          {/* Floating telemetry grid */}
+          <div className="landing-stage-column">
+            <div className="landing-car-stage">
+              <div className="stage-caption"><span className="eyebrow">GRIDLOCK / CONCEPT 01</span><span>3D design studio</span></div>
+              <Suspense fallback={<img className="car-poster" src="/models/cars/gridlock-formula/fallback.svg" alt="GRIDLOCK open-wheel concept" />}><HeroCarScene /></Suspense>
+            </div>
+          {/* Season results */}
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
             className="panel panel-glow" style={{ padding: 20 }}>
             <div className="row between" style={{ marginBottom: 14 }}>
-              <span className="eyebrow">Live Fantasy Grid</span>
-              <span className="chip chip-live"><span className="dot" />Race Week</span>
+              <span className="eyebrow">Season fantasy leaders</span>
+              <span className="chip">Season results</span>
             </div>
             <div className="col gap-1">
               {drivers.map((d, i) => (
@@ -116,9 +114,11 @@ export default function Landing() {
               ))}
             </div>
           </motion.div>
+          </div>
         </div>
       </section>
 
+      {feedError && <div className="container feed-notice" role="status">{feedError}</div>}
       {/* Race weekend preview */}
       <section id="weekend" className="container" style={{ padding: '30px 20px' }}>
         <div className="panel" style={{ overflow: 'hidden' }}>
@@ -135,7 +135,7 @@ export default function Landing() {
               {nr && <Countdown iso={nr.deadline} />}
             </div>
           </div>
-          <div className="row" style={{ borderTop: '1px solid var(--line)' }}>
+          <div className="row session-strip" style={{ borderTop: '1px solid var(--line)' }}>
             {['FP1', 'FP2', 'FP3', 'QUALIFYING', 'RACE'].map((s, i) => (
               <div key={s} className="grow" style={{ padding: '16px', textAlign: 'center', borderLeft: i ? '1px solid var(--line)' : 'none', background: s === 'RACE' ? 'var(--surface-2)' : 'transparent' }}>
                 <div className="eyebrow" style={{ color: s === 'RACE' ? 'var(--red)' : undefined }}>{s}</div>
@@ -147,19 +147,19 @@ export default function Landing() {
 
       {/* Build-your-team demo */}
       <section id="drivers" className="container" style={{ padding: '40px 20px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
+        <div className="landing-builder-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'center' }}>
           <div>
             <span className="eyebrow">The team builder</span>
             <h2 className="display" style={{ fontSize: 'clamp(28px,4vw,44px)', margin: '10px 0 16px' }}>$300M. Your top 10.</h2>
             <p className="text-dim" style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 20 }}>
-              Ten drivers, two constructors, one captain on double points — laid out like a real
+              Ten drivers, two constructors, one captain on {meta?.config.captain_multiplier ?? 1.5}× points — laid out like a real
               starting grid. Spend it on the front row or find value deep in the midfield.
             </p>
             <div className="col gap-2">
               {[
                 ['Fill the grid', 'Ten driver slots, paired up like a real starting grid.'],
                 ['Stay under budget', 'A $300M cap — spend it wisely.'],
-                ['Name your captain', 'Double points on the driver you trust.'],
+                ['Name your captain', 'A captain multiplier on the driver you trust.'],
               ].map(([t, d]) => (
                 <div key={t} className="row gap-2 race-edge" style={{ padding: '8px 0 8px 16px' }}>
                   <div><div style={{ fontWeight: 600 }}>{t}</div><div className="text-faint" style={{ fontSize: 13 }}>{d}</div></div>
@@ -195,9 +195,9 @@ export default function Landing() {
         <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
           {[
             [Gauge, 'Deep scoring', 'Points for qualifying, positions gained, fastest laps, teammate battles, DNFs and more — all from a transparent engine.'],
-            [Radio, 'Live race centre', 'Watch your fantasy points tick up lap by lap with a broadcast-style timing tower.'],
+            [Radio, 'Live race centre', 'Follow weekend results and inspect every scoring event as data arrives.'],
             [Users, 'Private leagues', 'Spin up a league in seconds, share a code, and settle it on the track.'],
-            [Zap, 'Tactical boosts', 'Turbo, Double Stack, Wildcard and more — deploy them at the perfect moment.'],
+            [Zap, 'Tactical boosts', 'Back an Underdog for a 2× round multiplier if they finish P6–P10.'],
             [LineChart, 'Driver analytics', 'Compare form, value and race history to find the edge before the deadline.'],
             [Trophy, 'Global grid', 'Climb a worldwide leaderboard built to scale to millions of managers.'],
           ].map(([Icon, title, body], i) => {
@@ -249,7 +249,7 @@ export default function Landing() {
       <footer style={{ borderTop: '1px solid var(--line)' }}>
         <div className="container row between wrap gap-2" style={{ padding: '24px 20px', color: 'var(--text-faint)', fontSize: 13 }}>
           <Brand size={15} />
-          <span>Unofficial fan project for a private group. Driver, team and race data via OpenF1 — not affiliated with Formula 1. Free-to-play — no real-money wagering.</span>
+          <span>Unofficial fan project for a private group. Driver, team and race data via OpenF1 / Jolpica — not affiliated with Formula 1. Free-to-play — no real-money wagering.</span>
         </div>
       </footer>
     </div>

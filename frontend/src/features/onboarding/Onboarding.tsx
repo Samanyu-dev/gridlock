@@ -5,9 +5,10 @@ import { ArrowRight, ArrowLeft, Check, Shuffle } from 'lucide-react'
 import { Brand } from '../../components/Brand'
 import { RacingLine } from '../../components/RacingLine'
 import { api } from '../../lib/api'
+import { useMeta } from '../../lib/meta'
 import { useSession } from '../../lib/session'
 import { flagEmoji, money } from '../../lib/format'
-import type { Constructor, Driver, Meta } from '../../lib/types'
+import type { Constructor, Driver } from '../../lib/types'
 
 const PERSONAS = [
   { id: 'casual', label: 'Casual fan', desc: 'Here for the vibes and the weekend.' },
@@ -20,7 +21,7 @@ export default function Onboarding() {
   const navigate = useNavigate()
   const { setSession, authed: existing } = useSession()
   const [step, setStep] = useState(0)
-  const [meta, setMeta] = useState<Meta | null>(null)
+  const meta = useMeta()
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [constructors, setConstructors] = useState<Constructor[]>([])
 
@@ -36,7 +37,6 @@ export default function Onboarding() {
 
   useEffect(() => {
     if (existing) { navigate('/home'); return }
-    api.meta().then(setMeta).catch(() => {})
     api.drivers({ sort: 'points' }).then((r) => setDrivers(r.drivers)).catch(() => {})
     api.constructors().then((r) => setConstructors(r.constructors)).catch(() => {})
   }, [existing, navigate])

@@ -4,6 +4,7 @@ import { Home, Users, Radio, Flag, UserRound, Layers, Trophy, MoreHorizontal, Se
 import { BrandGlyph } from './Brand'
 import { CommandPalette } from './CommandPalette'
 import { NotificationBell } from './NotificationBell'
+import { useMetaStatus } from '../lib/meta'
 import { useSession } from '../lib/session'
 
 const RAIL = [
@@ -25,6 +26,7 @@ const MOBILE = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { theme, toggleTheme, profile } = useSession()
+  const { meta, error } = useMetaStatus()
 
   return (
     <div className="shell">
@@ -59,6 +61,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NotificationBell />
           </div>
         </header>
+        <div className="race-context-strip">
+          <span className="eyebrow">Race control</span>
+          <strong>{meta?.next_race?.name ?? 'Loading schedule'}</strong>
+          <span className="text-dim">{meta?.next_race?.round_state?.toLowerCase()} · {meta?.data_source ?? meta?.provider}</span>
+          {(error || meta?.data_status === 'stale') && <span role="status" className="text-loss">{error ?? 'Feed delayed · showing last confirmed data'}</span>}
+        </div>
         <div className="shell__content">{children}</div>
       </div>
 
