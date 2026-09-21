@@ -4,6 +4,27 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        // Vite's default chunk-naming picks whichever module happens to be
+        // first in that async boundary's graph — it silently renamed the 3D
+        // engine chunk once (e.g. to "EnvironmentRig-*.js"), which broke the
+        // PWA globIgnores/runtimeCaching patterns below that match on a
+        // literal "gl3d-"/"circuitManifest-" filename prefix, precaching a
+        // >1MB chunk for every visitor instead of only 3D-page visitors.
+        // Forcing a stable name here is what those patterns actually need.
+        manualChunks(id) {
+          if (id.includes('/src/lib/gl3d/circuitManifest') || id.includes('/src/lib/gl3d/circuits/')) {
+            return 'circuitManifest'
+          }
+          if (id.includes('/src/components/gl3d/') || id.includes('/src/lib/gl3d/')) {
+            return 'gl3d'
+          }
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
